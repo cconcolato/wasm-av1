@@ -23,8 +23,8 @@
         const frame_time = 1000.0 / 24.0;   // milliseconds per frame. Demo is all 24fps video
         let frame_count = 0;
         let max_run = 0.0;
-        let WIDTH = 352;
-        let HEIGHT = 288;
+        let WIDTH = 640;
+        let HEIGHT = 360;
         const measure = true;
         let high_bitdepth = false;
 
@@ -53,8 +53,6 @@
                 } else {
                     Module._AVX_YUV8_to_RGB(rgb_image, buf, WIDTH, HEIGHT, 0, 1);
                 }
-                var w = Module._AVX_Decoder_get_width(af);
-                var h = Module._AVX_Decoder_get_height(af);
                 if (measure) { var t2 = performance.now(); }
                 // Paint the image onto the canvas
                 drawImageToCanvas(new Uint8Array(Module.HEAPU8.buffer, rgb_image, 3 * WIDTH * HEIGHT), WIDTH, HEIGHT);
@@ -72,16 +70,16 @@
             if (video_running === false) {
                 return;
             }
-            // if (Module._AVX_Decoder_video_finished(av1_decoder)) {
-            //     video_running = false;
-            //     Module._DS_close(data_source);
-            //     Module._AVX_Decoder_destroy(av1_decoder);
-            //     if (measure) {
-            //         console.log(frames + " frames: " + "YUV->RGB " + yuv_converts + "ms, draw " + draws + "ms decode " + runs + "ms");
-            //         console.log("Max run is " + max_run + "ms");
-            //     }
-            //     return;
-            // }
+            if (Module._AVX_Decoder_video_finished(av1_decoder)) {
+                video_running = false;
+                Module._DS_close(data_source);
+                Module._AVX_Decoder_destroy(av1_decoder);
+                if (measure) {
+                    console.log(frames + " frames: " + "YUV->RGB " + yuv_converts + "ms, draw " + draws + "ms decode " + runs + "ms");
+                    console.log("Max run is " + max_run + "ms");
+                }
+                return;
+            }
             // Check if elapsed time means we should show a frame (poor mans sync)
             if ((start_time + frame_count * frame_time) > performance.now()) {
                 return;

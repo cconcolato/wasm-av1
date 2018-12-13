@@ -15,7 +15,7 @@
 #
 SRCS=decode-av1.c
 
-AOMDIR=../aom
+AOMDIR=third_party/aom
 
 LIBDIR=third_party/embuild
 
