@@ -16,14 +16,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_ports/mem.h"
 #include "aom_scale/aom_scale.h"
 #include "av1/common/common.h"
 #include "av1/common/resize.h"
 
-#include "./aom_scale_rtcd.h"
+#include "config/aom_scale_rtcd.h"
 
 // Filters for interpolation (0.5-band) - note this also filters integer pels.
 static const InterpKernel filteredinterp_filters500[(1 << RS_SUBPEL_BITS)] = {
@@ -169,42 +170,6 @@ static const InterpKernel filteredinterp_filters875[(1 << RS_SUBPEL_BITS)] = {
   { -1, 3, -9, 17, 112, 10, -7, 3 },  { -1, 3, -8, 15, 112, 12, -7, 2 },
 };
 
-// Filters for interpolation (full-band) - no filtering for integer pixels
-static const InterpKernel filteredinterp_filters1000[(1 << RS_SUBPEL_BITS)] = {
-  { 0, 0, 0, 128, 0, 0, 0, 0 },        { 0, 0, -1, 128, 2, -1, 0, 0 },
-  { 0, 1, -3, 127, 4, -2, 1, 0 },      { 0, 1, -4, 127, 6, -3, 1, 0 },
-  { 0, 2, -6, 126, 8, -3, 1, 0 },      { 0, 2, -7, 125, 11, -4, 1, 0 },
-  { -1, 2, -8, 125, 13, -5, 2, 0 },    { -1, 3, -9, 124, 15, -6, 2, 0 },
-  { -1, 3, -10, 123, 18, -6, 2, -1 },  { -1, 3, -11, 122, 20, -7, 3, -1 },
-  { -1, 4, -12, 121, 22, -8, 3, -1 },  { -1, 4, -13, 120, 25, -9, 3, -1 },
-  { -1, 4, -14, 118, 28, -9, 3, -1 },  { -1, 4, -15, 117, 30, -10, 4, -1 },
-  { -1, 5, -16, 116, 32, -11, 4, -1 }, { -1, 5, -16, 114, 35, -12, 4, -1 },
-  { -1, 5, -17, 112, 38, -12, 4, -1 }, { -1, 5, -18, 111, 40, -13, 5, -1 },
-  { -1, 5, -18, 109, 43, -14, 5, -1 }, { -1, 6, -19, 107, 45, -14, 5, -1 },
-  { -1, 6, -19, 105, 48, -15, 5, -1 }, { -1, 6, -19, 103, 51, -16, 5, -1 },
-  { -1, 6, -20, 101, 53, -16, 6, -1 }, { -1, 6, -20, 99, 56, -17, 6, -1 },
-  { -1, 6, -20, 97, 58, -17, 6, -1 },  { -1, 6, -20, 95, 61, -18, 6, -1 },
-  { -2, 7, -20, 93, 64, -18, 6, -2 },  { -2, 7, -20, 91, 66, -19, 6, -1 },
-  { -2, 7, -20, 88, 69, -19, 6, -1 },  { -2, 7, -20, 86, 71, -19, 6, -1 },
-  { -2, 7, -20, 84, 74, -20, 7, -2 },  { -2, 7, -20, 81, 76, -20, 7, -1 },
-  { -2, 7, -20, 79, 79, -20, 7, -2 },  { -1, 7, -20, 76, 81, -20, 7, -2 },
-  { -2, 7, -20, 74, 84, -20, 7, -2 },  { -1, 6, -19, 71, 86, -20, 7, -2 },
-  { -1, 6, -19, 69, 88, -20, 7, -2 },  { -1, 6, -19, 66, 91, -20, 7, -2 },
-  { -2, 6, -18, 64, 93, -20, 7, -2 },  { -1, 6, -18, 61, 95, -20, 6, -1 },
-  { -1, 6, -17, 58, 97, -20, 6, -1 },  { -1, 6, -17, 56, 99, -20, 6, -1 },
-  { -1, 6, -16, 53, 101, -20, 6, -1 }, { -1, 5, -16, 51, 103, -19, 6, -1 },
-  { -1, 5, -15, 48, 105, -19, 6, -1 }, { -1, 5, -14, 45, 107, -19, 6, -1 },
-  { -1, 5, -14, 43, 109, -18, 5, -1 }, { -1, 5, -13, 40, 111, -18, 5, -1 },
-  { -1, 4, -12, 38, 112, -17, 5, -1 }, { -1, 4, -12, 35, 114, -16, 5, -1 },
-  { -1, 4, -11, 32, 116, -16, 5, -1 }, { -1, 4, -10, 30, 117, -15, 4, -1 },
-  { -1, 3, -9, 28, 118, -14, 4, -1 },  { -1, 3, -9, 25, 120, -13, 4, -1 },
-  { -1, 3, -8, 22, 121, -12, 4, -1 },  { -1, 3, -7, 20, 122, -11, 3, -1 },
-  { -1, 2, -6, 18, 123, -10, 3, -1 },  { 0, 2, -6, 15, 124, -9, 3, -1 },
-  { 0, 2, -5, 13, 125, -8, 2, -1 },    { 0, 1, -4, 11, 125, -7, 2, 0 },
-  { 0, 1, -3, 8, 126, -6, 2, 0 },      { 0, 1, -3, 6, 127, -4, 1, 0 },
-  { 0, 1, -2, 4, 127, -3, 1, 0 },      { 0, 0, -1, 2, 128, -1, 0, 0 },
-};
-
 const int16_t av1_resize_filter_normative[(
     1 << RS_SUBPEL_BITS)][UPSCALE_NORMATIVE_TAPS] = {
 #if UPSCALE_NORMATIVE_TAPS == 8
@@ -244,6 +209,9 @@ const int16_t av1_resize_filter_normative[(
 #error "Invalid value of UPSCALE_NORMATIVE_TAPS"
 #endif  // UPSCALE_NORMATIVE_TAPS == 8
 };
+
+// Filters for interpolation (full-band) - no filtering for integer pixels
+#define filteredinterp_filters1000 av1_resize_filter_normative
 
 // Filters for factor of 2 downsampling.
 static const int16_t av1_down2_symeven_half_filter[] = { 56, 12, -3, -1 };
@@ -555,9 +523,9 @@ static void fill_arr_to_col(uint8_t *img, int stride, int len, uint8_t *arr) {
   }
 }
 
-static void resize_plane(const uint8_t *const input, int height, int width,
-                         int in_stride, uint8_t *output, int height2,
-                         int width2, int out_stride) {
+void av1_resize_plane(const uint8_t *const input, int height, int width,
+                      int in_stride, uint8_t *output, int height2, int width2,
+                      int out_stride) {
   int i;
   uint8_t *intbuf = (uint8_t *)aom_malloc(sizeof(uint8_t) * width2 * height);
   uint8_t *tmpbuf =
@@ -903,10 +871,9 @@ static void highbd_fill_arr_to_col(uint16_t *img, int stride, int len,
   }
 }
 
-static void highbd_resize_plane(const uint8_t *const input, int height,
-                                int width, int in_stride, uint8_t *output,
-                                int height2, int width2, int out_stride,
-                                int bd) {
+void av1_highbd_resize_plane(const uint8_t *const input, int height, int width,
+                             int in_stride, uint8_t *output, int height2,
+                             int width2, int out_stride, int bd) {
   int i;
   uint16_t *intbuf = (uint16_t *)aom_malloc(sizeof(uint16_t) * width2 * height);
   uint16_t *tmpbuf =
@@ -1001,11 +968,11 @@ void av1_resize_frame420(const uint8_t *const y, int y_stride,
                          int uv_stride, int height, int width, uint8_t *oy,
                          int oy_stride, uint8_t *ou, uint8_t *ov,
                          int ouv_stride, int oheight, int owidth) {
-  resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
-  resize_plane(u, height / 2, width / 2, uv_stride, ou, oheight / 2, owidth / 2,
-               ouv_stride);
-  resize_plane(v, height / 2, width / 2, uv_stride, ov, oheight / 2, owidth / 2,
-               ouv_stride);
+  av1_resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
+  av1_resize_plane(u, height / 2, width / 2, uv_stride, ou, oheight / 2,
+                   owidth / 2, ouv_stride);
+  av1_resize_plane(v, height / 2, width / 2, uv_stride, ov, oheight / 2,
+                   owidth / 2, ouv_stride);
 }
 
 void av1_resize_frame422(const uint8_t *const y, int y_stride,
@@ -1013,11 +980,11 @@ void av1_resize_frame422(const uint8_t *const y, int y_stride,
                          int uv_stride, int height, int width, uint8_t *oy,
                          int oy_stride, uint8_t *ou, uint8_t *ov,
                          int ouv_stride, int oheight, int owidth) {
-  resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
-  resize_plane(u, height, width / 2, uv_stride, ou, oheight, owidth / 2,
-               ouv_stride);
-  resize_plane(v, height, width / 2, uv_stride, ov, oheight, owidth / 2,
-               ouv_stride);
+  av1_resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
+  av1_resize_plane(u, height, width / 2, uv_stride, ou, oheight, owidth / 2,
+                   ouv_stride);
+  av1_resize_plane(v, height, width / 2, uv_stride, ov, oheight, owidth / 2,
+                   ouv_stride);
 }
 
 void av1_resize_frame444(const uint8_t *const y, int y_stride,
@@ -1025,9 +992,11 @@ void av1_resize_frame444(const uint8_t *const y, int y_stride,
                          int uv_stride, int height, int width, uint8_t *oy,
                          int oy_stride, uint8_t *ou, uint8_t *ov,
                          int ouv_stride, int oheight, int owidth) {
-  resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
-  resize_plane(u, height, width, uv_stride, ou, oheight, owidth, ouv_stride);
-  resize_plane(v, height, width, uv_stride, ov, oheight, owidth, ouv_stride);
+  av1_resize_plane(y, height, width, y_stride, oy, oheight, owidth, oy_stride);
+  av1_resize_plane(u, height, width, uv_stride, ou, oheight, owidth,
+                   ouv_stride);
+  av1_resize_plane(v, height, width, uv_stride, ov, oheight, owidth,
+                   ouv_stride);
 }
 
 void av1_highbd_resize_frame420(const uint8_t *const y, int y_stride,
@@ -1036,12 +1005,12 @@ void av1_highbd_resize_frame420(const uint8_t *const y, int y_stride,
                                 uint8_t *oy, int oy_stride, uint8_t *ou,
                                 uint8_t *ov, int ouv_stride, int oheight,
                                 int owidth, int bd) {
-  highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
-                      oy_stride, bd);
-  highbd_resize_plane(u, height / 2, width / 2, uv_stride, ou, oheight / 2,
-                      owidth / 2, ouv_stride, bd);
-  highbd_resize_plane(v, height / 2, width / 2, uv_stride, ov, oheight / 2,
-                      owidth / 2, ouv_stride, bd);
+  av1_highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
+                          oy_stride, bd);
+  av1_highbd_resize_plane(u, height / 2, width / 2, uv_stride, ou, oheight / 2,
+                          owidth / 2, ouv_stride, bd);
+  av1_highbd_resize_plane(v, height / 2, width / 2, uv_stride, ov, oheight / 2,
+                          owidth / 2, ouv_stride, bd);
 }
 
 void av1_highbd_resize_frame422(const uint8_t *const y, int y_stride,
@@ -1050,12 +1019,12 @@ void av1_highbd_resize_frame422(const uint8_t *const y, int y_stride,
                                 uint8_t *oy, int oy_stride, uint8_t *ou,
                                 uint8_t *ov, int ouv_stride, int oheight,
                                 int owidth, int bd) {
-  highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
-                      oy_stride, bd);
-  highbd_resize_plane(u, height, width / 2, uv_stride, ou, oheight, owidth / 2,
-                      ouv_stride, bd);
-  highbd_resize_plane(v, height, width / 2, uv_stride, ov, oheight, owidth / 2,
-                      ouv_stride, bd);
+  av1_highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
+                          oy_stride, bd);
+  av1_highbd_resize_plane(u, height, width / 2, uv_stride, ou, oheight,
+                          owidth / 2, ouv_stride, bd);
+  av1_highbd_resize_plane(v, height, width / 2, uv_stride, ov, oheight,
+                          owidth / 2, ouv_stride, bd);
 }
 
 void av1_highbd_resize_frame444(const uint8_t *const y, int y_stride,
@@ -1064,12 +1033,12 @@ void av1_highbd_resize_frame444(const uint8_t *const y, int y_stride,
                                 uint8_t *oy, int oy_stride, uint8_t *ou,
                                 uint8_t *ov, int ouv_stride, int oheight,
                                 int owidth, int bd) {
-  highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
-                      oy_stride, bd);
-  highbd_resize_plane(u, height, width, uv_stride, ou, oheight, owidth,
-                      ouv_stride, bd);
-  highbd_resize_plane(v, height, width, uv_stride, ov, oheight, owidth,
-                      ouv_stride, bd);
+  av1_highbd_resize_plane(y, height, width, y_stride, oy, oheight, owidth,
+                          oy_stride, bd);
+  av1_highbd_resize_plane(u, height, width, uv_stride, ou, oheight, owidth,
+                          ouv_stride, bd);
+  av1_highbd_resize_plane(v, height, width, uv_stride, ov, oheight, owidth,
+                          ouv_stride, bd);
 }
 
 void av1_resize_and_extend_frame(const YV12_BUFFER_CONFIG *src,
@@ -1082,15 +1051,15 @@ void av1_resize_and_extend_frame(const YV12_BUFFER_CONFIG *src,
   for (int i = 0; i < AOMMIN(num_planes, MAX_MB_PLANE); ++i) {
     const int is_uv = i > 0;
     if (src->flags & YV12_FLAG_HIGHBITDEPTH)
-      highbd_resize_plane(src->buffers[i], src->crop_heights[is_uv],
-                          src->crop_widths[is_uv], src->strides[is_uv],
-                          dst->buffers[i], dst->crop_heights[is_uv],
-                          dst->crop_widths[is_uv], dst->strides[is_uv], bd);
+      av1_highbd_resize_plane(src->buffers[i], src->crop_heights[is_uv],
+                              src->crop_widths[is_uv], src->strides[is_uv],
+                              dst->buffers[i], dst->crop_heights[is_uv],
+                              dst->crop_widths[is_uv], dst->strides[is_uv], bd);
     else
-      resize_plane(src->buffers[i], src->crop_heights[is_uv],
-                   src->crop_widths[is_uv], src->strides[is_uv],
-                   dst->buffers[i], dst->crop_heights[is_uv],
-                   dst->crop_widths[is_uv], dst->strides[is_uv]);
+      av1_resize_plane(src->buffers[i], src->crop_heights[is_uv],
+                       src->crop_widths[is_uv], src->strides[is_uv],
+                       dst->buffers[i], dst->crop_heights[is_uv],
+                       dst->crop_widths[is_uv], dst->strides[is_uv]);
   }
   aom_extend_frame_borders(dst, num_planes);
 }
@@ -1099,7 +1068,7 @@ void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint8_t *src,
                                 int src_stride, uint8_t *dst, int dst_stride,
                                 int plane, int rows) {
   const int is_uv = (plane > 0);
-  const int ss_x = is_uv && cm->subsampling_x;
+  const int ss_x = is_uv && cm->seq_params.subsampling_x;
   const int downscaled_plane_width = ROUND_POWER_OF_TWO(cm->width, ss_x);
   const int upscaled_plane_width =
       ROUND_POWER_OF_TWO(cm->superres_upscaled_width, ss_x);
@@ -1140,10 +1109,11 @@ void av1_upscale_normative_rows(const AV1_COMMON *cm, const uint8_t *src,
     const int pad_left = (j == 0);
     const int pad_right = (j == cm->tile_cols - 1);
 
-    if (cm->use_highbitdepth)
-      highbd_upscale_normative_rect(
-          src_ptr, rows, src_width, src_stride, dst_ptr, rows, dst_width,
-          dst_stride, x_step_qn, x0_qn, pad_left, pad_right, cm->bit_depth);
+    if (cm->seq_params.use_highbitdepth)
+      highbd_upscale_normative_rect(src_ptr, rows, src_width, src_stride,
+                                    dst_ptr, rows, dst_width, dst_stride,
+                                    x_step_qn, x0_qn, pad_left, pad_right,
+                                    cm->seq_params.bit_depth);
     else
       upscale_normative_rect(src_ptr, rows, src_width, src_stride, dst_ptr,
                              rows, dst_width, dst_stride, x_step_qn, x0_qn,
@@ -1174,7 +1144,7 @@ YV12_BUFFER_CONFIG *av1_scale_if_required(AV1_COMMON *cm,
   const int num_planes = av1_num_planes(cm);
   if (cm->width != unscaled->y_crop_width ||
       cm->height != unscaled->y_crop_height) {
-    av1_resize_and_extend_frame(unscaled, scaled, (int)cm->bit_depth,
+    av1_resize_and_extend_frame(unscaled, scaled, (int)cm->seq_params.bit_depth,
                                 num_planes);
     return scaled;
   } else {
@@ -1186,10 +1156,19 @@ YV12_BUFFER_CONFIG *av1_scale_if_required(AV1_COMMON *cm,
 // denominator.
 static void calculate_scaled_size_helper(int *dim, int denom) {
   if (denom != SCALE_NUMERATOR) {
+    // We need to ensure the constraint in "Appendix A" of the spec:
+    // * FrameWidth is greater than or equal to 16
+    // * FrameHeight is greater than or equal to 16
+    // For this, we clamp the downscaled dimension to at least 16. One
+    // exception: if original dimension itself was < 16, then we keep the
+    // downscaled dimension to be same as the original, to ensure that resizing
+    // is valid.
+    const int min_dim = AOMMIN(16, *dim);
     // Use this version if we need *dim to be even
     // *width = (*width * SCALE_NUMERATOR + denom) / (2 * denom);
     // *width <<= 1;
     *dim = (*dim * SCALE_NUMERATOR + denom / 2) / (denom);
+    *dim = AOMMAX(*dim, min_dim);
   }
 }
 
@@ -1230,7 +1209,8 @@ static void copy_buffer_config(const YV12_BUFFER_CONFIG *const src,
 // Upscale decoded image.
 void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
   const int num_planes = av1_num_planes(cm);
-  if (av1_superres_unscaled(cm)) return;
+  if (!av1_superres_scaled(cm)) return;
+  const SequenceHeader *const seq_params = &cm->seq_params;
 
   YV12_BUFFER_CONFIG copy_buffer;
   memset(&copy_buffer, 0, sizeof(copy_buffer));
@@ -1238,10 +1218,10 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
   YV12_BUFFER_CONFIG *const frame_to_show = get_frame_new_buffer(cm);
 
   const int aligned_width = ALIGN_POWER_OF_TWO(cm->width, 3);
-  if (aom_alloc_frame_buffer(&copy_buffer, aligned_width, cm->height,
-                             cm->subsampling_x, cm->subsampling_y,
-                             cm->use_highbitdepth, AOM_BORDER_IN_PIXELS,
-                             cm->byte_alignment))
+  if (aom_alloc_frame_buffer(
+          &copy_buffer, aligned_width, cm->height, seq_params->subsampling_x,
+          seq_params->subsampling_y, seq_params->use_highbitdepth,
+          AOM_BORDER_IN_PIXELS, cm->byte_alignment))
     aom_internal_error(&cm->error, AOM_CODEC_MEM_ERROR,
                        "Failed to allocate copy buffer for superres upscaling");
 
@@ -1268,11 +1248,11 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
           "Failed to free current frame buffer before superres upscaling");
 
     // aom_realloc_frame_buffer() leaves config data for frame_to_show intact
-    if (aom_realloc_frame_buffer(frame_to_show, cm->superres_upscaled_width,
-                                 cm->superres_upscaled_height,
-                                 cm->subsampling_x, cm->subsampling_y,
-                                 cm->use_highbitdepth, AOM_BORDER_IN_PIXELS,
-                                 cm->byte_alignment, fb, cb, cb_priv))
+    if (aom_realloc_frame_buffer(
+            frame_to_show, cm->superres_upscaled_width,
+            cm->superres_upscaled_height, seq_params->subsampling_x,
+            seq_params->subsampling_y, seq_params->use_highbitdepth,
+            AOM_BORDER_IN_PIXELS, cm->byte_alignment, fb, cb, cb_priv))
       aom_internal_error(
           &cm->error, AOM_CODEC_MEM_ERROR,
           "Failed to allocate current frame buffer for superres upscaling");
@@ -1282,10 +1262,11 @@ void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool) {
 
     // Don't use callbacks on the encoder.
     // aom_alloc_frame_buffer() clears the config data for frame_to_show
-    if (aom_alloc_frame_buffer(frame_to_show, cm->superres_upscaled_width,
-                               cm->superres_upscaled_height, cm->subsampling_x,
-                               cm->subsampling_y, cm->use_highbitdepth,
-                               AOM_BORDER_IN_PIXELS, cm->byte_alignment))
+    if (aom_alloc_frame_buffer(
+            frame_to_show, cm->superres_upscaled_width,
+            cm->superres_upscaled_height, seq_params->subsampling_x,
+            seq_params->subsampling_y, seq_params->use_highbitdepth,
+            AOM_BORDER_IN_PIXELS, cm->byte_alignment))
       aom_internal_error(
           &cm->error, AOM_CODEC_MEM_ERROR,
           "Failed to reallocate current frame buffer for superres upscaling");

@@ -110,8 +110,8 @@ static INLINE void read_coeffs_reverse(aom_reader *r, TX_SIZE tx_size,
 uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
                             aom_reader *const r, const int blk_row,
                             const int blk_col, const int plane,
-                            const TXB_CTX *const txb_ctx, const TX_SIZE tx_size,
-                            int16_t *const max_scan_line, int *const eob) {
+                            const TXB_CTX *const txb_ctx,
+                            const TX_SIZE tx_size) {
   FRAME_CONTEXT *const ec_ctx = xd->tile_ctx;
   const int32_t max_value = (1 << (7 + xd->bd)) - 1;
   const int32_t min_value = -(1 << (7 + xd->bd));
@@ -120,7 +120,7 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
   MB_MODE_INFO *const mbmi = xd->mi[0];
   struct macroblockd_plane *const pd = &xd->plane[plane];
   const int16_t *const dequant = pd->seg_dequant_QTX[mbmi->segment_id];
-  tran_low_t *const tcoeffs = pd->dqcoeff;
+  tran_low_t *const tcoeffs = pd->dqcoeff_block + xd->cb_offset[plane];
   const int shift = av1_get_tx_scale(tx_size);
   const int bwl = get_txb_bwl(tx_size);
   const int width = get_txb_wide(tx_size);
@@ -131,6 +131,10 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
   uint8_t *const levels = set_levels(levels_buf, width);
   const int all_zero = aom_read_symbol(
       r, ec_ctx->txb_skip_cdf[txs_ctx][txb_ctx->txb_skip_ctx], 2, ACCT_STR);
+  eob_info *eob_data = pd->eob_data + xd->txb_offset[plane];
+  uint16_t *const eob = &(eob_data->eob);
+  uint16_t *const max_scan_line = &(eob_data->max_scan_line);
+  *max_scan_line = 0;
   *eob = 0;
   if (all_zero) {
     *max_scan_line = 0;
@@ -211,8 +215,9 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
   }
 
   if (k_eob_offset_bits[eob_pt] > 0) {
+    const int eob_ctx = eob_pt - 3;
     int bit = aom_read_symbol(
-        r, ec_ctx->eob_extra_cdf[txs_ctx][plane_type][eob_pt], 2, ACCT_STR);
+        r, ec_ctx->eob_extra_cdf[txs_ctx][plane_type][eob_ctx], 2, ACCT_STR);
     if (bit) {
       eob_extra += (1 << (k_eob_offset_bits[eob_pt] - 1));
     }
@@ -264,6 +269,13 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
     }
   }
 
+  int16_t num_zero_coeffs = 0;
+  for (int c = 0; c < *eob; ++c) {
+    const int pos = scan[c];
+    num_zero_coeffs = AOMMAX(num_zero_coeffs, pos);
+  }
+  memset(tcoeffs, 0, (num_zero_coeffs + 1) * sizeof(tcoeffs[0]));
+
   for (int c = 0; c < *eob; ++c) {
     const int pos = scan[c];
     uint8_t sign;
@@ -308,23 +320,43 @@ uint8_t av1_read_coeffs_txb(const AV1_COMMON *const cm, MACROBLOCKD *const xd,
   return cul_level;
 }
 
-uint8_t av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
-                                   MACROBLOCKD *const xd, aom_reader *const r,
-                                   const int row, const int col,
-                                   const int plane, const TX_SIZE tx_size,
-                                   int16_t *const max_scan_line,
-                                   int *const eob) {
+void av1_read_coeffs_txb_facade(const AV1_COMMON *const cm,
+                                MACROBLOCKD *const xd, aom_reader *const r,
+                                const int plane, const int row, const int col,
+                                const TX_SIZE tx_size) {
+#if TXCOEFF_TIMER
+  struct aom_usec_timer timer;
+  aom_usec_timer_start(&timer);
+#endif
   MB_MODE_INFO *const mbmi = xd->mi[0];
   struct macroblockd_plane *const pd = &xd->plane[plane];
 
   const BLOCK_SIZE bsize = mbmi->sb_type;
-  const BLOCK_SIZE plane_bsize = get_plane_block_size(bsize, pd);
+  const BLOCK_SIZE plane_bsize =
+      get_plane_block_size(bsize, pd->subsampling_x, pd->subsampling_y);
 
   TXB_CTX txb_ctx;
   get_txb_ctx(plane_bsize, tx_size, plane, pd->above_context + col,
               pd->left_context + row, &txb_ctx);
-  const uint8_t cul_level = av1_read_coeffs_txb(
-      cm, xd, r, row, col, plane, &txb_ctx, tx_size, max_scan_line, eob);
+  const uint8_t cul_level =
+      av1_read_coeffs_txb(cm, xd, r, row, col, plane, &txb_ctx, tx_size);
   av1_set_contexts(xd, pd, plane, plane_bsize, tx_size, cul_level, col, row);
-  return cul_level;
+
+  if (is_inter_block(mbmi)) {
+    PLANE_TYPE plane_type = get_plane_type(plane);
+    // tx_type will be read out in av1_read_coeffs_txb_facade
+    const TX_TYPE tx_type = av1_get_tx_type(plane_type, xd, row, col, tx_size,
+                                            cm->reduced_tx_set_used);
+
+    if (plane == 0)
+      update_txk_array(mbmi->txk_type, mbmi->sb_type, row, col, tx_size,
+                       tx_type);
+  }
+
+#if TXCOEFF_TIMER
+  aom_usec_timer_mark(&timer);
+  const int64_t elapsed_time = aom_usec_timer_elapsed(&timer);
+  cm->txcoeff_timer += elapsed_time;
+  ++cm->txb_count;
+#endif
 }

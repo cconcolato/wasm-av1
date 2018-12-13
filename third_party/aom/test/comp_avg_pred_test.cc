@@ -11,13 +11,13 @@
 
 #include "test/comp_avg_pred_test.h"
 
-using ::testing::make_tuple;
-using ::testing::tuple;
 using libaom_test::ACMRandom;
 using libaom_test::AV1JNTCOMPAVG::AV1HighBDJNTCOMPAVGTest;
 using libaom_test::AV1JNTCOMPAVG::AV1HighBDJNTCOMPAVGUPSAMPLEDTest;
 using libaom_test::AV1JNTCOMPAVG::AV1JNTCOMPAVGTest;
 using libaom_test::AV1JNTCOMPAVG::AV1JNTCOMPAVGUPSAMPLEDTest;
+using ::testing::make_tuple;
+using ::testing::tuple;
 
 namespace {
 
@@ -50,9 +50,9 @@ TEST_P(AV1HighBDJNTCOMPAVGTest, DISABLED_Speed) { RunSpeedTest(GET_PARAM(1)); }
 TEST_P(AV1HighBDJNTCOMPAVGTest, CheckOutput) { RunCheckOutput(GET_PARAM(1)); }
 
 #if HAVE_SSE2
-INSTANTIATE_TEST_CASE_P(
-    SSE2, AV1HighBDJNTCOMPAVGTest,
-    libaom_test::AV1JNTCOMPAVG::BuildParams(aom_highbd_jnt_comp_avg_pred_sse2));
+INSTANTIATE_TEST_CASE_P(SSE2, AV1HighBDJNTCOMPAVGTest,
+                        libaom_test::AV1JNTCOMPAVG::BuildParams(
+                            aom_highbd_jnt_comp_avg_pred_sse2, 1));
 #endif
 
 TEST_P(AV1HighBDJNTCOMPAVGUPSAMPLEDTest, DISABLED_Speed) {

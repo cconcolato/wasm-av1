@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_TOKENIZE_H_
-#define AV1_ENCODER_TOKENIZE_H_
+#ifndef AOM_AV1_ENCODER_TOKENIZE_H_
+#define AOM_AV1_ENCODER_TOKENIZE_H_
 
 #include "av1/common/entropy.h"
 #include "av1/encoder/block.h"
@@ -28,6 +28,7 @@ typedef struct {
 
 struct AV1_COMP;
 struct ThreadData;
+struct FRAME_COUNTS;
 
 struct tokenize_b_args {
   const struct AV1_COMP *cpi;
@@ -57,7 +58,7 @@ int av1_cost_color_map(const MACROBLOCK *const x, int plane, BLOCK_SIZE bsize,
 void av1_tokenize_color_map(const MACROBLOCK *const x, int plane,
                             TOKENEXTRA **t, BLOCK_SIZE bsize, TX_SIZE tx_size,
                             COLOR_MAP_TYPE type, int allow_update_cdf,
-                            FRAME_COUNTS *counts);
+                            struct FRAME_COUNTS *counts);
 
 static INLINE int av1_get_tx_eob(const struct segmentation *seg, int segment_id,
                                  TX_SIZE tx_size) {
@@ -69,4 +70,4 @@ static INLINE int av1_get_tx_eob(const struct segmentation *seg, int segment_id,
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_TOKENIZE_H_
+#endif  // AOM_AV1_ENCODER_TOKENIZE_H_

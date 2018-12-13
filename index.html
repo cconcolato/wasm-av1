@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>AV1 Wasm decoder demo</title>
+    <title>AVIF Wasm decoder demo</title>
     <style>
       body { font-family: sans-serif; }
     </style>
   </head>
   <body>
-    <p>Show 24fps AV1 video in an IVF file</p> <input type="file" id="files" name="files[]"/>
+    <p>Select an AVIF file</p> <input type="file" id="files" name="files[]"/>
     <br/>
     <canvas id="view" width="1280px" height="720px"></canvas>
+    <script src="third_party/mp4box.js/mp4box.all.js"></script>
+    <script src="avif.js"></script>
     <script src="decode-av1.js"></script>
     <script>
         let wasm_loaded = false;
@@ -21,9 +23,10 @@
         const frame_time = 1000.0 / 24.0;   // milliseconds per frame. Demo is all 24fps video
         let frame_count = 0;
         let max_run = 0.0;
-        let WIDTH = 640;
-        let HEIGHT = 360;
+        let WIDTH = 352;
+        let HEIGHT = 288;
         const measure = true;
+        let high_bitdepth = false;
 
         Module.onRuntimeInitialized = function() {
             wasm_loaded = true;
@@ -45,7 +48,13 @@
                 // Convert The 16-bit YUV to 8-bit RGB
                 let buf = Module._AVX_Video_Frame_get_buffer(af);
                 if (measure) { var t1 = performance.now(); }
-                Module._AVX_YUV_to_RGB(rgb_image, buf, WIDTH, HEIGHT);
+                if (high_bitdepth) {
+                    Module._AVX_YUV16_to_RGB(rgb_image, buf, WIDTH, HEIGHT, 0, 4);
+                } else {
+                    Module._AVX_YUV8_to_RGB(rgb_image, buf, WIDTH, HEIGHT, 0, 1);
+                }
+                var w = Module._AVX_Decoder_get_width(af);
+                var h = Module._AVX_Decoder_get_height(af);
                 if (measure) { var t2 = performance.now(); }
                 // Paint the image onto the canvas
                 drawImageToCanvas(new Uint8Array(Module.HEAPU8.buffer, rgb_image, 3 * WIDTH * HEIGHT), WIDTH, HEIGHT);
@@ -63,16 +72,16 @@
             if (video_running === false) {
                 return;
             }
-            if (Module._AVX_Decoder_video_finished(av1_decoder)) {
-                video_running = false;
-                Module._DS_close(data_source);
-                Module._AVX_Decoder_destroy(av1_decoder);
-                if (measure) {
-                    console.log(frames + " frames: " + "YUV->RGB " + yuv_converts + "ms, draw " + draws + "ms decode " + runs + "ms");
-                    console.log("Max run is " + max_run + "ms");
-                }
-                return;
-            }
+            // if (Module._AVX_Decoder_video_finished(av1_decoder)) {
+            //     video_running = false;
+            //     Module._DS_close(data_source);
+            //     Module._AVX_Decoder_destroy(av1_decoder);
+            //     if (measure) {
+            //         console.log(frames + " frames: " + "YUV->RGB " + yuv_converts + "ms, draw " + draws + "ms decode " + runs + "ms");
+            //         console.log("Max run is " + max_run + "ms");
+            //     }
+            //     return;
+            // }
             // Check if elapsed time means we should show a frame (poor mans sync)
             if ((start_time + frame_count * frame_time) > performance.now()) {
                 return;
@@ -99,19 +108,27 @@
             if (files[0]) {
                 var f = files[0];
 
-                var reader = new FileReader();
-                // Closure to capture the file information.
-                reader.onload = (function(theFile) {
-                    return function(e) {
-                        fileAsArray = e.target.result;
-                        if (fileAsArray.byteLength > 0) {
-                            start_playback();
-                        }
-                    };
-                })(f);
+                if (f.name.endsWith(".avif")) {
+                    parseAVIFFile(f, function(_high_bitdepth, buffer) {
+                        high_bitdepth = _high_bitdepth;
+                        fileAsArray = buffer;
+                        start_playback();
+                    });
+                } else {
+                    var reader = new FileReader();
+                    // Closure to capture the file information.
+                    reader.onload = (function(theFile) {
+                        return function(e) {
+                            fileAsArray = e.target.result;
+                            if (fileAsArray.byteLength > 0) {
+                                start_playback();
+                            }
+                        };
+                    })(f);
 
-                // Read in the image file as an array buffer.
-                reader.readAsArrayBuffer(f);
+                    // Read in the image file as an array buffer.
+                    reader.readAsArrayBuffer(f);
+                }
             }
         }
         function start_playback() {

@@ -12,13 +12,10 @@
 #include <math.h>
 #include <stdlib.h>
 
-#ifdef HAVE_CONFIG_H
-#include "./config.h"
-#endif
+#include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
 
-#include "./aom_dsp_rtcd.h"
-#include "./av1_rtcd.h"
-#include "./cdef.h"
+#include "av1/common/cdef.h"
 
 /* Generated from gen_filter_tables.c. */
 DECLARE_ALIGNED(16, const int, cdef_directions[8][2]) = {
@@ -117,7 +114,7 @@ const int cdef_sec_taps[2][2] = { { 2, 1 }, { 2, 1 } };
 void cdef_filter_block_c(uint8_t *dst8, uint16_t *dst16, int dstride,
                          const uint16_t *in, int pri_strength, int sec_strength,
                          int dir, int pri_damping, int sec_damping, int bsize,
-                         AOM_UNUSED int max_unused, int coeff_shift) {
+                         int coeff_shift) {
   int i, j, k;
   const int s = CDEF_BSTRIDE;
   const int *pri_taps = cdef_pri_taps[(pri_strength >> coeff_shift) & 1];
@@ -240,12 +237,11 @@ void cdef_filter_fb(uint8_t *dst8, uint16_t *dst16, int dstride, uint16_t *in,
     by = dlist[bi].by;
     bx = dlist[bi].bx;
     if (dst8)
-      cdef_filter_block(&dst8[(by << bsizey) * dstride + (bx << bsizex)], NULL,
-                        dstride,
-                        &in[(by * CDEF_BSTRIDE << bsizey) + (bx << bsizex)],
-                        (pli ? t : adjust_strength(t, var[by][bx])), s,
-                        t ? dir[by][bx] : 0, pri_damping, sec_damping, bsize,
-                        (256 << coeff_shift) - 1, coeff_shift);
+      cdef_filter_block(
+          &dst8[(by << bsizey) * dstride + (bx << bsizex)], NULL, dstride,
+          &in[(by * CDEF_BSTRIDE << bsizey) + (bx << bsizex)],
+          (pli ? t : adjust_strength(t, var[by][bx])), s, t ? dir[by][bx] : 0,
+          pri_damping, sec_damping, bsize, coeff_shift);
     else
       cdef_filter_block(
           NULL,
@@ -254,7 +250,6 @@ void cdef_filter_fb(uint8_t *dst8, uint16_t *dst16, int dstride, uint16_t *in,
           dirinit ? 1 << bsizex : dstride,
           &in[(by * CDEF_BSTRIDE << bsizey) + (bx << bsizex)],
           (pli ? t : adjust_strength(t, var[by][bx])), s, t ? dir[by][bx] : 0,
-          pri_damping, sec_damping, bsize, (256 << coeff_shift) - 1,
-          coeff_shift);
+          pri_damping, sec_damping, bsize, coeff_shift);
   }
 }

@@ -9,10 +9,10 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_BLOCKD_H_
-#define AV1_COMMON_BLOCKD_H_
+#ifndef AOM_AV1_COMMON_BLOCKD_H_
+#define AOM_AV1_COMMON_BLOCKD_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
 
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_ports/mem.h"
@@ -38,13 +38,13 @@ extern "C" {
 #define MAX_DIFFWTD_MASK_BITS 1
 
 // DIFFWTD_MASK_TYPES should not surpass 1 << MAX_DIFFWTD_MASK_BITS
-typedef enum {
+typedef enum ATTRIBUTE_PACKED {
   DIFFWTD_38 = 0,
   DIFFWTD_38_INV,
   DIFFWTD_MASK_TYPES,
 } DIFFWTD_MASK_TYPE;
 
-typedef enum {
+typedef enum ATTRIBUTE_PACKED {
   KEY_FRAME = 0,
   INTER_FRAME = 1,
   INTRA_ONLY_FRAME = 2,  // replaces intra-only
@@ -57,7 +57,7 @@ static INLINE int is_comp_ref_allowed(BLOCK_SIZE bsize) {
 }
 
 static INLINE int is_inter_mode(PREDICTION_MODE mode) {
-  return mode >= NEARESTMV && mode <= NEW_NEWMV;
+  return mode >= INTER_MODE_START && mode < INTER_MODE_END;
 }
 
 typedef struct {
@@ -66,10 +66,10 @@ typedef struct {
 } BUFFER_SET;
 
 static INLINE int is_inter_singleref_mode(PREDICTION_MODE mode) {
-  return mode >= NEARESTMV && mode <= NEWMV;
+  return mode >= SINGLE_INTER_MODE_START && mode < SINGLE_INTER_MODE_END;
 }
 static INLINE int is_inter_compound_mode(PREDICTION_MODE mode) {
-  return mode >= NEAREST_NEARESTMV && mode <= NEW_NEWMV;
+  return mode >= COMP_INTER_MODE_START && mode < COMP_INTER_MODE_END;
 }
 
 static INLINE PREDICTION_MODE compound_ref0_mode(PREDICTION_MODE mode) {
@@ -148,10 +148,6 @@ static INLINE int have_newmv_in_inter_mode(PREDICTION_MODE mode) {
           mode == NEW_NEARESTMV || mode == NEAR_NEWMV || mode == NEW_NEARMV);
 }
 
-static INLINE int use_masked_motion_search(COMPOUND_TYPE type) {
-  return (type == COMPOUND_WEDGE);
-}
-
 static INLINE int is_masked_compound_type(COMPOUND_TYPE type) {
   return (type == COMPOUND_WEDGE || type == COMPOUND_DIFFWTD);
 }
@@ -159,8 +155,6 @@ static INLINE int is_masked_compound_type(COMPOUND_TYPE type) {
 /* For keyframes, intra block modes are predicted by the (already decoded)
    modes for the Y blocks to the left and above us; for interframes, there
    is a single probability table. */
-
-typedef int8_t MV_REFERENCE_FRAME;
 
 typedef struct {
   // Number of base colors for Y (0) and UV (1)
@@ -196,6 +190,11 @@ typedef struct RD_STATS {
   int64_t ref_rdcost;
   int zero_rate;
   uint8_t invalid_rate;
+#if CONFIG_ONE_PASS_SVM
+  int eob, eob_0, eob_1, eob_2, eob_3;
+  int64_t rd, rd_0, rd_1, rd_2, rd_3;
+  int64_t y_sse, sse_0, sse_1, sse_2, sse_3;
+#endif
 #if CONFIG_RD_DEBUG
   int txb_coeff_cost[MAX_MB_PLANE];
   int txb_coeff_cost_map[MAX_MB_PLANE][TXB_COEFF_COST_MAP_SIZE]
@@ -210,7 +209,7 @@ typedef struct {
   int wedge_sign;
   DIFFWTD_MASK_TYPE mask_type;
   uint8_t *seg_mask;
-  COMPOUND_TYPE interinter_compound_type;
+  COMPOUND_TYPE type;
 } INTERINTER_COMPOUND_DATA;
 
 #define INTER_TX_SIZE_BUF_LEN 16
@@ -251,10 +250,7 @@ typedef struct MB_MODE_INFO {
   int interintra_wedge_index;
   int interintra_wedge_sign;
   // interinter members
-  COMPOUND_TYPE interinter_compound_type;
-  int wedge_index;
-  int wedge_sign;
-  DIFFWTD_MASK_TYPE mask_type;
+  INTERINTER_COMPOUND_DATA interinter_comp;
   MOTION_MODE motion_mode;
   int overlappable_neighbors[2];
   int_mv mv[2];
@@ -262,16 +258,16 @@ typedef struct MB_MODE_INFO {
   PARTITION_TYPE partition;
   /* deringing gain *per-superblock* */
   int8_t cdef_strength;
-  int current_q_index;
-  int current_delta_lf_from_base;
-  int curr_delta_lf[FRAME_LF_COUNT];
+  int current_qindex;
+  int delta_lf_from_base;
+  int delta_lf[FRAME_LF_COUNT];
 #if CONFIG_RD_DEBUG
   RD_STATS rd_stats;
   int mi_row;
   int mi_col;
 #endif
-  int num_proj_ref[2];
-  WarpedMotionParams wm_params[2];
+  int num_proj_ref;
+  WarpedMotionParams wm_params;
 
   // Index of the alpha Cb and alpha Cr combination
   int cfl_alpha_idx;
@@ -379,7 +375,7 @@ static INLINE void mi_to_pixel_loc(int *pixel_c, int *pixel_r, int mi_col,
 }
 #endif
 
-enum mv_precision { MV_PRECISION_Q3, MV_PRECISION_Q4 };
+enum ATTRIBUTE_PACKED mv_precision { MV_PRECISION_Q3, MV_PRECISION_Q4 };
 
 struct buf_2d {
   uint8_t *buf;
@@ -389,8 +385,22 @@ struct buf_2d {
   int stride;
 };
 
+typedef struct eob_info {
+  uint16_t eob;
+  uint16_t max_scan_line;
+} eob_info;
+
+typedef struct {
+  DECLARE_ALIGNED(32, tran_low_t, dqcoeff[MAX_MB_PLANE][MAX_SB_SQUARE]);
+  eob_info eob_data[MAX_MB_PLANE]
+                   [MAX_SB_SQUARE / (TX_SIZE_W_MIN * TX_SIZE_H_MIN)];
+  DECLARE_ALIGNED(16, uint8_t, color_index_map[2][MAX_SB_SQUARE]);
+} CB_BUFFER;
+
 typedef struct macroblockd_plane {
   tran_low_t *dqcoeff;
+  tran_low_t *dqcoeff_block;
+  eob_info *eob_data;
   PLANE_TYPE plane_type;
   int subsampling_x;
   int subsampling_y;
@@ -399,7 +409,7 @@ typedef struct macroblockd_plane {
   ENTROPY_CONTEXT *above_context;
   ENTROPY_CONTEXT *left_context;
 
-  // The dequantizers below are true dequntizers used only in the
+  // The dequantizers below are true dequantizers used only in the
   // dequantization process.  They have the same coefficient
   // shift/scale as TX.
   int16_t seg_dequant_QTX[MAX_SEGMENTS][2];
@@ -421,10 +431,11 @@ typedef struct macroblockd_plane {
 #define BLOCK_OFFSET(x, i) \
   ((x) + (i) * (1 << (tx_size_wide_log2[0] + tx_size_high_log2[0])))
 
+struct RefCntBuffer;
+
 typedef struct RefBuffer {
-  int idx;      // frame buf idx
   int map_idx;  // frame map idx
-  YV12_BUFFER_CONFIG *buf;
+  struct RefCntBuffer *buf;
   struct scale_factors sf;
 } RefBuffer;
 
@@ -449,11 +460,11 @@ typedef struct {
 #define CFL_BUF_LINE_I256 (CFL_BUF_LINE >> 4)
 #define CFL_BUF_SQUARE (CFL_BUF_LINE * CFL_BUF_LINE)
 typedef struct cfl_ctx {
-  // The CfL prediction buffer is used in two steps:
-  //   1. Stores Q3 reconstructed luma pixels
-  //      (only Q2 is required, but Q3 is used to avoid shifts)
-  //   2. Stores Q3 AC contributions (step1 - tx block avg)
-  int16_t pred_buf_q3[CFL_BUF_SQUARE];
+  // Q3 reconstructed luma pixels (only Q2 is required, but Q3 is used to avoid
+  // shifts)
+  uint16_t recon_buf_q3[CFL_BUF_SQUARE];
+  // Q3 AC contributions (reconstructed luma pixels - tx block avg)
+  int16_t ac_buf_q3[CFL_BUF_SQUARE];
 
   // Cache the DC_PRED when performing RDO, so it does not have to be recomputed
   // for every scaling parameter
@@ -489,12 +500,11 @@ typedef struct jnt_comp_params {
   int bck_offset;
 } JNT_COMP_PARAMS;
 
+// Most/all of the pointers are mere pointers to actual arrays are allocated
+// elsewhere. This is mostly for coding convenience.
 typedef struct macroblockd {
   struct macroblockd_plane plane[MAX_MB_PLANE];
-  uint8_t bmode_blocks_wl;
-  uint8_t bmode_blocks_hl;
 
-  FRAME_COUNTS *counts;
   TileInfo tile;
 
   int mi_stride;
@@ -516,8 +526,6 @@ typedef struct macroblockd {
   int mb_to_top_edge;
   int mb_to_bottom_edge;
 
-  FRAME_CONTEXT *fc;
-
   /* pointers to reference frames */
   const RefBuffer *block_refs[2];
 
@@ -538,7 +546,7 @@ typedef struct macroblockd {
   SgrprojInfo sgrproj_info[MAX_MB_PLANE];
 
   // block dimension in the unit of mode_info.
-  uint8_t n8_w, n8_h;
+  uint8_t n4_w, n4_h;
 
   uint8_t ref_mv_count[MODE_CTX_REF_FRAMES];
   CANDIDATE_MV ref_mv_stack[MODE_CTX_REF_FRAMES][MAX_REF_MV_STACK_SIZE];
@@ -559,7 +567,6 @@ typedef struct macroblockd {
   // same with that in AV1_COMMON
   struct aom_internal_error_info *error_info;
   const WarpedMotionParams *global_motion;
-  int prev_qindex;
   int delta_qindex;
   int current_qindex;
   // Since actual frame level loop filtering level value is not available
@@ -568,8 +575,7 @@ typedef struct macroblockd {
   // filtering level) and code the delta between previous superblock's delta
   // lf and current delta lf. It is equivalent to the delta between previous
   // superblock's actual lf and current lf.
-  int prev_delta_lf_from_base;
-  int current_delta_lf_from_base;
+  int delta_lf_from_base;
   // For this experiment, we have four frame filter levels for different plane
   // and direction. So, to support the per superblock update, we need to add
   // a few more params as below.
@@ -583,19 +589,31 @@ typedef struct macroblockd {
   // SEG_LVL_ALT_LF_Y_H = 2;
   // SEG_LVL_ALT_LF_U   = 3;
   // SEG_LVL_ALT_LF_V   = 4;
-  int prev_delta_lf[FRAME_LF_COUNT];
-  int curr_delta_lf[FRAME_LF_COUNT];
+  int delta_lf[FRAME_LF_COUNT];
   int cdef_preset[4];
 
   DECLARE_ALIGNED(16, uint8_t, seg_mask[2 * MAX_SB_SQUARE]);
-
+  uint8_t *mc_buf[2];
   CFL_CTX cfl;
 
   JNT_COMP_PARAMS jcp_param;
+
+  uint16_t cb_offset[MAX_MB_PLANE];
+  uint16_t txb_offset[MAX_MB_PLANE];
+  uint16_t color_index_map_offset[2];
+
+  CONV_BUF_TYPE *tmp_conv_dst;
+  uint8_t *tmp_obmc_bufs[2];
 } MACROBLOCKD;
 
 static INLINE int get_bitdepth_data_path_index(const MACROBLOCKD *xd) {
   return xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH ? 1 : 0;
+}
+
+static INLINE uint8_t *get_buf_by_bd(const MACROBLOCKD *xd, uint8_t *buf16) {
+  return (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH)
+             ? CONVERT_TO_BYTEPTR(buf16)
+             : buf16;
 }
 
 static INLINE int get_sqr_bsize_idx(BLOCK_SIZE bsize) {
@@ -610,6 +628,11 @@ static INLINE int get_sqr_bsize_idx(BLOCK_SIZE bsize) {
   }
 }
 
+// For a square block size 'bsize', returns the size of the sub-blocks used by
+// the given partition type. If the partition produces sub-blocks of different
+// sizes, then the function returns the largest sub-block size.
+// Implements the Partition_Subsize lookup table in the spec (Section 9.3.
+// Conversion tables).
 // Note: the input block size should be square.
 // Otherwise it's considered invalid.
 static INLINE BLOCK_SIZE get_partition_subsize(BLOCK_SIZE bsize,
@@ -627,19 +650,19 @@ static INLINE BLOCK_SIZE get_partition_subsize(BLOCK_SIZE bsize,
 static TX_TYPE intra_mode_to_tx_type(const MB_MODE_INFO *mbmi,
                                      PLANE_TYPE plane_type) {
   static const TX_TYPE _intra_mode_to_tx_type[INTRA_MODES] = {
-    DCT_DCT,    // DC
-    ADST_DCT,   // V
-    DCT_ADST,   // H
-    DCT_DCT,    // D45
-    ADST_ADST,  // D135
-    ADST_DCT,   // D117
-    DCT_ADST,   // D153
-    DCT_ADST,   // D207
-    ADST_DCT,   // D63
-    ADST_ADST,  // SMOOTH
-    ADST_DCT,   // SMOOTH_V
-    DCT_ADST,   // SMOOTH_H
-    ADST_ADST,  // PAETH
+    DCT_DCT,    // DC_PRED
+    ADST_DCT,   // V_PRED
+    DCT_ADST,   // H_PRED
+    DCT_DCT,    // D45_PRED
+    ADST_ADST,  // D135_PRED
+    ADST_DCT,   // D113_PRED
+    DCT_ADST,   // D157_PRED
+    DCT_ADST,   // D203_PRED
+    ADST_DCT,   // D67_PRED
+    ADST_ADST,  // SMOOTH_PRED
+    ADST_DCT,   // SMOOTH_V_PRED
+    DCT_ADST,   // SMOOTH_H_PRED
+    ADST_ADST,  // PAETH_PRED
   };
   const PREDICTION_MODE mode =
       (plane_type == PLANE_TYPE_Y) ? mbmi->mode : get_uv_mode(mbmi->uv_mode);
@@ -665,6 +688,15 @@ static const int av1_ext_tx_used[EXT_TX_SET_TYPES][TX_TYPES] = {
   { 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0 },
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0 },
   { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+};
+
+static const uint16_t av1_ext_tx_used_flag[EXT_TX_SET_TYPES] = {
+  0x0001,  // 0000 0000 0000 0001
+  0x0201,  // 0000 0010 0000 0001
+  0x020F,  // 0000 0010 0000 1111
+  0x0E0F,  // 0000 1110 0000 1111
+  0x0FFF,  // 0000 1111 1111 1111
+  0xFFFF,  // 1111 1111 1111 1111
 };
 
 static INLINE TxSetType av1_get_ext_tx_set_type(TX_SIZE tx_size, int is_inter,
@@ -759,10 +791,13 @@ static INLINE TX_TYPE get_default_tx_type(PLANE_TYPE plane_type,
   return intra_mode_to_tx_type(mbmi, plane_type);
 }
 
-static INLINE BLOCK_SIZE
-get_plane_block_size(BLOCK_SIZE bsize, const struct macroblockd_plane *pd) {
+// Implements the get_plane_residual_size() function in the spec (Section
+// 5.11.38. Get plane residual size function).
+static INLINE BLOCK_SIZE get_plane_block_size(BLOCK_SIZE bsize,
+                                              int subsampling_x,
+                                              int subsampling_y) {
   if (bsize == BLOCK_INVALID) return BLOCK_INVALID;
-  return ss_size_lookup[bsize][pd->subsampling_x][pd->subsampling_y];
+  return ss_size_lookup[bsize][subsampling_x][subsampling_y];
 }
 
 static INLINE int av1_get_txb_size_index(BLOCK_SIZE bsize, int blk_row,
@@ -899,9 +934,10 @@ static INLINE TX_SIZE av1_get_adjusted_tx_size(TX_SIZE tx_size) {
   }
 }
 
-static INLINE TX_SIZE
-av1_get_max_uv_txsize(BLOCK_SIZE bsize, const struct macroblockd_plane *pd) {
-  const BLOCK_SIZE plane_bsize = get_plane_block_size(bsize, pd);
+static INLINE TX_SIZE av1_get_max_uv_txsize(BLOCK_SIZE bsize, int subsampling_x,
+                                            int subsampling_y) {
+  const BLOCK_SIZE plane_bsize =
+      get_plane_block_size(bsize, subsampling_x, subsampling_y);
   assert(plane_bsize < BLOCK_SIZES_ALL);
   const TX_SIZE uv_tx = max_txsize_rect_lookup[plane_bsize];
   return av1_get_adjusted_tx_size(uv_tx);
@@ -912,11 +948,14 @@ static INLINE TX_SIZE av1_get_tx_size(int plane, const MACROBLOCKD *xd) {
   if (xd->lossless[mbmi->segment_id]) return TX_4X4;
   if (plane == 0) return mbmi->tx_size;
   const MACROBLOCKD_PLANE *pd = &xd->plane[plane];
-  return av1_get_max_uv_txsize(mbmi->sb_type, pd);
+  return av1_get_max_uv_txsize(mbmi->sb_type, pd->subsampling_x,
+                               pd->subsampling_y);
 }
 
 void av1_reset_skip_context(MACROBLOCKD *xd, int mi_row, int mi_col,
                             BLOCK_SIZE bsize, const int num_planes);
+
+void av1_reset_loop_filter_delta(MACROBLOCKD *xd, int num_planes);
 
 void av1_reset_loop_restoration(MACROBLOCKD *xd, const int num_planes);
 
@@ -924,15 +963,6 @@ typedef void (*foreach_transformed_block_visitor)(int plane, int block,
                                                   int blk_row, int blk_col,
                                                   BLOCK_SIZE plane_bsize,
                                                   TX_SIZE tx_size, void *arg);
-
-void av1_foreach_transformed_block_in_plane(
-    const MACROBLOCKD *const xd, BLOCK_SIZE bsize, int plane,
-    foreach_transformed_block_visitor visit, void *arg);
-
-void av1_foreach_transformed_block(const MACROBLOCKD *const xd,
-                                   BLOCK_SIZE bsize, int mi_row, int mi_col,
-                                   foreach_transformed_block_visitor visit,
-                                   void *arg, const int num_planes);
 
 void av1_set_contexts(const MACROBLOCKD *xd, struct macroblockd_plane *pd,
                       int plane, BLOCK_SIZE plane_bsize, TX_SIZE tx_size,
@@ -949,7 +979,7 @@ static INLINE int is_interintra_allowed_bsize(const BLOCK_SIZE bsize) {
 }
 
 static INLINE int is_interintra_allowed_mode(const PREDICTION_MODE mode) {
-  return (mode >= NEARESTMV) && (mode <= NEWMV);
+  return (mode >= SINGLE_INTER_MODE_START) && (mode < SINGLE_INTER_MODE_END);
 }
 
 static INLINE int is_interintra_allowed_ref(const MV_REFERENCE_FRAME rf[2]) {
@@ -1018,7 +1048,7 @@ motion_mode_allowed(const WarpedMotionParams *gm_params, const MACROBLOCKD *xd,
       is_motion_variation_allowed_compound(mbmi)) {
     if (!check_num_overlappable_neighbors(mbmi)) return SIMPLE_TRANSLATION;
     assert(!has_second_ref(mbmi));
-    if (mbmi->num_proj_ref[0] >= 1 &&
+    if (mbmi->num_proj_ref >= 1 &&
         (allow_warped_motion && !av1_is_scaled(&(xd->block_refs[0]->sf)))) {
       if (xd->cur_frame_force_integer_mv) {
         return OBMC_CAUSAL;
@@ -1133,38 +1163,6 @@ static INLINE PLANE_TYPE get_plane_type(int plane) {
   return (plane == 0) ? PLANE_TYPE_Y : PLANE_TYPE_UV;
 }
 
-static INLINE void transpose_uint8(uint8_t *dst, int dst_stride,
-                                   const uint8_t *src, int src_stride, int w,
-                                   int h) {
-  int r, c;
-  for (r = 0; r < h; ++r)
-    for (c = 0; c < w; ++c) dst[c * dst_stride + r] = src[r * src_stride + c];
-}
-
-static INLINE void transpose_uint16(uint16_t *dst, int dst_stride,
-                                    const uint16_t *src, int src_stride, int w,
-                                    int h) {
-  int r, c;
-  for (r = 0; r < h; ++r)
-    for (c = 0; c < w; ++c) dst[c * dst_stride + r] = src[r * src_stride + c];
-}
-
-static INLINE void transpose_int16(int16_t *dst, int dst_stride,
-                                   const int16_t *src, int src_stride, int w,
-                                   int h) {
-  int r, c;
-  for (r = 0; r < h; ++r)
-    for (c = 0; c < w; ++c) dst[c * dst_stride + r] = src[r * src_stride + c];
-}
-
-static INLINE void transpose_int32(int32_t *dst, int dst_stride,
-                                   const int32_t *src, int src_stride, int w,
-                                   int h) {
-  int r, c;
-  for (r = 0; r < h; ++r)
-    for (c = 0; c < w; ++c) dst[c * dst_stride + r] = src[r * src_stride + c];
-}
-
 static INLINE int av1_get_max_eob(TX_SIZE tx_size) {
   if (tx_size == TX_64X64 || tx_size == TX_64X32 || tx_size == TX_32X64) {
     return 1024;
@@ -1179,4 +1177,4 @@ static INLINE int av1_get_max_eob(TX_SIZE tx_size) {
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_BLOCKD_H_
+#endif  // AOM_AV1_COMMON_BLOCKD_H_

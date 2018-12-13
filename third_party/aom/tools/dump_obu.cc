@@ -15,12 +15,13 @@
 #include <memory>
 #include <string>
 
-#include "./aom_config.h"
-#include "./ivfdec.h"
-#include "./obudec.h"
+#include "config/aom_config.h"
+
+#include "common/ivfdec.h"
+#include "common/obudec.h"
+#include "common/tools_common.h"
+#include "common/webmdec.h"
 #include "tools/obu_parser.h"
-#include "./tools_common.h"
-#include "./webmdec.h"
 
 namespace {
 
@@ -34,7 +35,6 @@ struct InputContext {
     memset(avx_ctx, 0, sizeof(*avx_ctx));
     memset(obu_ctx, 0, sizeof(*obu_ctx));
     obu_ctx->avx_ctx = avx_ctx;
-    obu_ctx->last_layer_id = IGNORE_ENHANCEMENT_LAYERS;
 #if CONFIG_WEBM_IO
     memset(webm_ctx, 0, sizeof(*webm_ctx));
 #endif
@@ -67,7 +67,7 @@ bool ReadTemporalUnit(InputContext *ctx, size_t *unit_size) {
   switch (file_type) {
     case FILE_TYPE_IVF: {
       if (ivf_read_frame(ctx->avx_ctx->file, &ctx->unit_buffer, unit_size,
-                         &ctx->unit_buffer_size)) {
+                         &ctx->unit_buffer_size, NULL)) {
         return false;
       }
       break;

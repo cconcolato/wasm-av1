@@ -13,7 +13,8 @@
 #include <math.h>
 #include <string.h>
 
-#include "./aom_scale_rtcd.h"
+#include "config/aom_scale_rtcd.h"
+
 #include "aom/aom_integer.h"
 #include "av1/common/cdef.h"
 #include "av1/common/cdef_block.h"
@@ -106,10 +107,10 @@ void copy_rect8_16bit_to_16bit_c(uint16_t *dst, int dstride,
   }
 }
 
-static void copy_sb8_16(AOM_UNUSED AV1_COMMON *cm, uint16_t *dst, int dstride,
+static void copy_sb8_16(AV1_COMMON *cm, uint16_t *dst, int dstride,
                         const uint8_t *src, int src_voffset, int src_hoffset,
                         int sstride, int vsize, int hsize) {
-  if (cm->use_highbitdepth) {
+  if (cm->seq_params.use_highbitdepth) {
     const uint16_t *base =
         &CONVERT_TO_SHORTPTR(src)[src_voffset * sstride + src_hoffset];
     copy_rect8_16bit_to_16bit(dst, dstride, base, sstride, vsize, hsize);
@@ -139,6 +140,7 @@ static INLINE void copy_rect(uint16_t *dst, int dstride, const uint16_t *src,
 
 void av1_cdef_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
                     MACROBLOCKD *xd) {
+  const CdefInfo *const cdef_info = &cm->cdef_info;
   const int num_planes = av1_num_planes(cm);
   DECLARE_ALIGNED(16, uint16_t, src[CDEF_INBUF_SIZE]);
   uint16_t *linebuf[3];
@@ -152,7 +154,7 @@ void av1_cdef_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
   int mi_high_l2[3];
   int xdec[3];
   int ydec[3];
-  int coeff_shift = AOMMAX(cm->bit_depth - 8, 0);
+  int coeff_shift = AOMMAX(cm->seq_params.bit_depth - 8, 0);
   const int nvfb = (cm->mi_rows + MI_SIZE_64X64 - 1) / MI_SIZE_64X64;
   const int nhfb = (cm->mi_cols + MI_SIZE_64X64 - 1) / MI_SIZE_64X64;
   av1_setup_dst_planes(xd->plane, cm->seq_params.sb_size, frame, 0, 0, 0,
@@ -230,13 +232,15 @@ void av1_cdef_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
           cm->mi_grid_visible[MI_SIZE_64X64 * fbr * cm->mi_stride +
                               MI_SIZE_64X64 * fbc]
               ->cdef_strength;
-      level = cm->cdef_strengths[mbmi_cdef_strength] / CDEF_SEC_STRENGTHS;
+      level =
+          cdef_info->cdef_strengths[mbmi_cdef_strength] / CDEF_SEC_STRENGTHS;
       sec_strength =
-          cm->cdef_strengths[mbmi_cdef_strength] % CDEF_SEC_STRENGTHS;
+          cdef_info->cdef_strengths[mbmi_cdef_strength] % CDEF_SEC_STRENGTHS;
       sec_strength += sec_strength == 3;
-      uv_level = cm->cdef_uv_strengths[mbmi_cdef_strength] / CDEF_SEC_STRENGTHS;
+      uv_level =
+          cdef_info->cdef_uv_strengths[mbmi_cdef_strength] / CDEF_SEC_STRENGTHS;
       uv_sec_strength =
-          cm->cdef_uv_strengths[mbmi_cdef_strength] % CDEF_SEC_STRENGTHS;
+          cdef_info->cdef_uv_strengths[mbmi_cdef_strength] % CDEF_SEC_STRENGTHS;
       uv_sec_strength += uv_sec_strength == 3;
       if ((level == 0 && sec_strength == 0 && uv_level == 0 &&
            uv_sec_strength == 0) ||
@@ -251,8 +255,8 @@ void av1_cdef_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
       for (int pli = 0; pli < num_planes; pli++) {
         int coffset;
         int rend, cend;
-        int pri_damping = cm->cdef_pri_damping;
-        int sec_damping = cm->cdef_sec_damping;
+        int pri_damping = cdef_info->cdef_pri_damping;
+        int sec_damping = cdef_info->cdef_sec_damping;
         int hsize = nhb << mi_wide_l2[pli];
         int vsize = nvb << mi_high_l2[pli];
 
@@ -362,7 +366,7 @@ void av1_cdef_frame(YV12_BUFFER_CONFIG *frame, AV1_COMMON *cm,
                     vsize + 2 * CDEF_VBORDER, CDEF_HBORDER, CDEF_VERY_LARGE);
         }
 
-        if (cm->use_highbitdepth) {
+        if (cm->seq_params.use_highbitdepth) {
           cdef_filter_fb(
               NULL,
               &CONVERT_TO_SHORTPTR(

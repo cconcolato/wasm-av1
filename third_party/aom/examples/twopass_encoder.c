@@ -52,9 +52,8 @@
 #include <string.h>
 
 #include "aom/aom_encoder.h"
-
-#include "../tools_common.h"
-#include "../video_writer.h"
+#include "common/tools_common.h"
+#include "common/video_writer.h"
 
 static const char *exec_name;
 
@@ -149,7 +148,8 @@ static void pass1(aom_image_t *raw, FILE *infile, const char *outfile_name,
   AvxVideoInfo info = { encoder->fourcc,
                         cfg->g_w,
                         cfg->g_h,
-                        { cfg->g_timebase.num, cfg->g_timebase.den } };
+                        { cfg->g_timebase.num, cfg->g_timebase.den },
+                        0 };
   AvxVideoWriter *writer = NULL;
   aom_codec_ctx_t codec;
   int frame_count = 0;

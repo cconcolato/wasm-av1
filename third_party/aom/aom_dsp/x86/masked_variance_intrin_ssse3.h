@@ -9,15 +9,16 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef _AOM_DSP_X86_MASKED_VARIANCE_INTRIN_SSSE3_H
-#define _AOM_DSP_X86_MASKED_VARIANCE_INTRIN_SSSE3_H
+#ifndef AOM_AOM_DSP_X86_MASKED_VARIANCE_INTRIN_SSSE3_H_
+#define AOM_AOM_DSP_X86_MASKED_VARIANCE_INTRIN_SSSE3_H_
 
 #include <stdlib.h>
 #include <string.h>
 #include <tmmintrin.h>
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "aom_dsp/blend.h"
 
 static INLINE void comp_mask_pred_16_ssse3(const uint8_t *src0,
@@ -88,4 +89,4 @@ static INLINE void comp_mask_pred_8_ssse3(uint8_t *comp_pred, int height,
   } while (i < height);
 }
 
-#endif
+#endif  // AOM_AOM_DSP_X86_MASKED_VARIANCE_INTRIN_SSSE3_H_

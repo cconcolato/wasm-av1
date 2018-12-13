@@ -11,7 +11,8 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./av1_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
@@ -20,8 +21,8 @@
 
 namespace {
 
-using ::testing::tuple;
 using libaom_test::ACMRandom;
+using ::testing::tuple;
 
 typedef void (*Predictor)(uint8_t *dst, ptrdiff_t stride, TX_SIZE tx_size,
                           const uint8_t *above, const uint8_t *left, int mode);

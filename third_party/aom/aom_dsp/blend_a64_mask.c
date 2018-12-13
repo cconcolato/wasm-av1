@@ -16,13 +16,13 @@
 #include "aom_dsp/blend.h"
 #include "aom_dsp/aom_dsp_common.h"
 
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 // Blending with alpha mask. Mask values come from the range [0, 64],
 // as described for AOM_BLEND_A64 in aom_dsp/blend.h. src0 or src1 can
 // be the same as dst, or dst can be different from both sources.
 
-// NOTE(david.barker): The input and output of aom_blend_a64_d32_mask_c() are
+// NOTE(david.barker): The input and output of aom_blend_a64_d16_mask_c() are
 // in a higher intermediate precision, and will later be rounded down to pixel
 // precision.
 // Thus, in order to avoid double-rounding, we want to use normal right shifts
@@ -30,16 +30,14 @@
 // This works because of the identity:
 // ROUND_POWER_OF_TWO(x >> y, z) == ROUND_POWER_OF_TWO(x, y+z)
 //
-// In contrast, the output of the non-d32 functions will not be further rounded,
+// In contrast, the output of the non-d16 functions will not be further rounded,
 // so we *should* use ROUND_POWER_OF_TWO there.
 
-void aom_lowbd_blend_a64_d16_mask(uint8_t *dst, uint32_t dst_stride,
-                                  const CONV_BUF_TYPE *src0,
-                                  uint32_t src0_stride,
-                                  const CONV_BUF_TYPE *src1,
-                                  uint32_t src1_stride, const uint8_t *mask,
-                                  uint32_t mask_stride, int h, int w, int subh,
-                                  int subw, ConvolveParams *conv_params) {
+void aom_lowbd_blend_a64_d16_mask_c(
+    uint8_t *dst, uint32_t dst_stride, const CONV_BUF_TYPE *src0,
+    uint32_t src0_stride, const CONV_BUF_TYPE *src1, uint32_t src1_stride,
+    const uint8_t *mask, uint32_t mask_stride, int w, int h, int subw, int subh,
+    ConvolveParams *conv_params) {
   int i, j;
   const int bd = 8;
   const int offset_bits = bd + 2 * FILTER_BITS - conv_params->round_0;
@@ -51,8 +49,8 @@ void aom_lowbd_blend_a64_d16_mask(uint8_t *dst, uint32_t dst_stride,
   assert(IMPLIES((void *)src0 == dst, src0_stride == dst_stride));
   assert(IMPLIES((void *)src1 == dst, src1_stride == dst_stride));
 
-  assert(h >= 1);
-  assert(w >= 1);
+  assert(h >= 4);
+  assert(w >= 4);
   assert(IS_POWER_OF_TWO(h));
   assert(IS_POWER_OF_TWO(w));
 
@@ -125,7 +123,7 @@ void aom_lowbd_blend_a64_d16_mask(uint8_t *dst, uint32_t dst_stride,
 void aom_highbd_blend_a64_d16_mask_c(
     uint8_t *dst_8, uint32_t dst_stride, const CONV_BUF_TYPE *src0,
     uint32_t src0_stride, const CONV_BUF_TYPE *src1, uint32_t src1_stride,
-    const uint8_t *mask, uint32_t mask_stride, int h, int w, int subh, int subw,
+    const uint8_t *mask, uint32_t mask_stride, int w, int h, int subw, int subh,
     ConvolveParams *conv_params, const int bd) {
   const int offset_bits = bd + 2 * FILTER_BITS - conv_params->round_0;
   const int round_offset = (1 << (offset_bits - conv_params->round_1)) +
@@ -229,8 +227,8 @@ void aom_highbd_blend_a64_d16_mask_c(
 void aom_blend_a64_mask_c(uint8_t *dst, uint32_t dst_stride,
                           const uint8_t *src0, uint32_t src0_stride,
                           const uint8_t *src1, uint32_t src1_stride,
-                          const uint8_t *mask, uint32_t mask_stride, int h,
-                          int w, int subh, int subw) {
+                          const uint8_t *mask, uint32_t mask_stride, int w,
+                          int h, int subw, int subh) {
   int i, j;
 
   assert(IMPLIES(src0 == dst, src0_stride == dst_stride));
@@ -287,7 +285,7 @@ void aom_highbd_blend_a64_mask_c(uint8_t *dst_8, uint32_t dst_stride,
                                  const uint8_t *src0_8, uint32_t src0_stride,
                                  const uint8_t *src1_8, uint32_t src1_stride,
                                  const uint8_t *mask, uint32_t mask_stride,
-                                 int h, int w, int subh, int subw, int bd) {
+                                 int w, int h, int subw, int subh, int bd) {
   int i, j;
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst_8);
   const uint16_t *src0 = CONVERT_TO_SHORTPTR(src0_8);

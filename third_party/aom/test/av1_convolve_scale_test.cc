@@ -13,7 +13,8 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./av1_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "aom_ports/aom_timer.h"
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
@@ -31,9 +32,9 @@ const int kHPad = 32;
 const int kXStepQn = 16;
 const int kYStepQn = 20;
 
+using libaom_test::ACMRandom;
 using ::testing::make_tuple;
 using ::testing::tuple;
-using libaom_test::ACMRandom;
 
 enum NTaps { EIGHT_TAP, TEN_TAP, TWELVE_TAP };
 int NTapsToInt(NTaps ntaps) { return 8 + static_cast<int>(ntaps) * 2; }
@@ -278,7 +279,7 @@ class ConvolveScaleTestBase : public ::testing::Test {
     filter_x_.set(ntaps_x_, false);
     filter_y_.set(ntaps_y_, true);
     convolve_params_ =
-        get_conv_params_no_round(0, avg_ != false, 0, NULL, 0, 1, bd);
+        get_conv_params_no_round(avg_ != false, 0, NULL, 0, 1, bd);
 
     delete image_;
     image_ = new TestImage<SrcPixel>(width_, height_, bd_);
@@ -389,8 +390,8 @@ typedef tuple<int, int> BlockDimension;
 
 typedef void (*LowbdConvolveFunc)(const uint8_t *src, int src_stride,
                                   uint8_t *dst, int dst_stride, int w, int h,
-                                  InterpFilterParams *filter_params_x,
-                                  InterpFilterParams *filter_params_y,
+                                  const InterpFilterParams *filter_params_x,
+                                  const InterpFilterParams *filter_params_y,
                                   const int subpel_x_qn, const int x_step_qn,
                                   const int subpel_y_qn, const int y_step_qn,
                                   ConvolveParams *conv_params);
@@ -462,8 +463,8 @@ INSTANTIATE_TEST_CASE_P(
 
 typedef void (*HighbdConvolveFunc)(const uint16_t *src, int src_stride,
                                    uint16_t *dst, int dst_stride, int w, int h,
-                                   InterpFilterParams *filter_params_x,
-                                   InterpFilterParams *filter_params_y,
+                                   const InterpFilterParams *filter_params_x,
+                                   const InterpFilterParams *filter_params_y,
                                    const int subpel_x_qn, const int x_step_qn,
                                    const int subpel_y_qn, const int y_step_qn,
                                    ConvolveParams *conv_params, int bd);

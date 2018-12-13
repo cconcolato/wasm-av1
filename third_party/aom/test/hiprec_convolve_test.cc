@@ -12,15 +12,14 @@
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 #include "test/hiprec_convolve_test_util.h"
 
-using ::testing::make_tuple;
-using ::testing::tuple;
 using libaom_test::ACMRandom;
 using libaom_test::AV1HighbdHiprecConvolve::AV1HighbdHiprecConvolveTest;
 using libaom_test::AV1HiprecConvolve::AV1HiprecConvolveTest;
+using ::testing::make_tuple;
+using ::testing::tuple;
 
 namespace {
 
-#if HAVE_SSE2 || HAVE_AVX2
 TEST_P(AV1HiprecConvolveTest, CheckOutput) { RunCheckOutput(GET_PARAM(3)); }
 TEST_P(AV1HiprecConvolveTest, DISABLED_SpeedTest) {
   RunSpeedTest(GET_PARAM(3));
@@ -35,6 +34,10 @@ INSTANTIATE_TEST_CASE_P(AVX2, AV1HiprecConvolveTest,
                         libaom_test::AV1HiprecConvolve::BuildParams(
                             av1_wiener_convolve_add_src_avx2));
 #endif
+#if HAVE_NEON
+INSTANTIATE_TEST_CASE_P(NEON, AV1HiprecConvolveTest,
+                        libaom_test::AV1HiprecConvolve::BuildParams(
+                            av1_wiener_convolve_add_src_neon));
 #endif
 
 #if HAVE_SSSE3 || HAVE_AVX2

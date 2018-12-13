@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <vector>
 
-#include "./av1_rtcd.h"
+#include "config/av1_rtcd.h"
 
 #include "aom_ports/aom_timer.h"
 #include "av1/common/av1_inv_txfm1d_cfg.h"
@@ -24,11 +24,11 @@
 #include "test/util.h"
 
 using libaom_test::ACMRandom;
-using libaom_test::InvTxfm2dFunc;
-using libaom_test::LbdInvTxfm2dFunc;
 using libaom_test::bd;
 using libaom_test::compute_avg_abs_error;
 using libaom_test::input_base;
+using libaom_test::InvTxfm2dFunc;
+using libaom_test::LbdInvTxfm2dFunc;
 
 using ::testing::Combine;
 using ::testing::Range;
@@ -363,5 +363,16 @@ extern "C" void av1_lowbd_inv_txfm2d_add_avx2(const int32_t *input,
 INSTANTIATE_TEST_CASE_P(AVX2, AV1LbdInvTxfm2d,
                         ::testing::Values(av1_lowbd_inv_txfm2d_add_avx2));
 #endif  // HAVE_AVX2
+
+#if HAVE_NEON
+
+extern "C" void av1_lowbd_inv_txfm2d_add_neon(const int32_t *input,
+                                              uint8_t *output, int stride,
+                                              TX_TYPE tx_type, TX_SIZE tx_size,
+                                              int eob);
+
+INSTANTIATE_TEST_CASE_P(NEON, AV1LbdInvTxfm2d,
+                        ::testing::Values(av1_lowbd_inv_txfm2d_add_neon));
+#endif  // HAVE_NEON
 
 }  // namespace

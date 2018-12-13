@@ -13,7 +13,8 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./av1_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
@@ -25,9 +26,9 @@
 
 namespace {
 
+using libaom_test::ACMRandom;
 using ::testing::make_tuple;
 using ::testing::tuple;
-using libaom_test::ACMRandom;
 
 typedef void (*SgrFunc)(const uint8_t *dat8, int width, int height, int stride,
                         int eps, const int *xqd, uint8_t *dst8, int dst_stride,
@@ -205,6 +206,11 @@ INSTANTIATE_TEST_CASE_P(SSE4_1, AV1SelfguidedFilterTest,
 #if HAVE_AVX2
 INSTANTIATE_TEST_CASE_P(AVX2, AV1SelfguidedFilterTest,
                         ::testing::Values(apply_selfguided_restoration_avx2));
+#endif
+
+#if HAVE_NEON
+INSTANTIATE_TEST_CASE_P(NEON, AV1SelfguidedFilterTest,
+                        ::testing::Values(apply_selfguided_restoration_neon));
 #endif
 
 // Test parameter list:
@@ -394,5 +400,11 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(::testing::Values(apply_selfguided_restoration_avx2),
                        ::testing::ValuesIn(highbd_params_avx2)));
 #endif
-
+#if HAVE_NEON
+const int highbd_params_neon[] = { 8, 10, 12 };
+INSTANTIATE_TEST_CASE_P(
+    NEON, AV1HighbdSelfguidedFilterTest,
+    ::testing::Combine(::testing::Values(apply_selfguided_restoration_neon),
+                       ::testing::ValuesIn(highbd_params_neon)));
+#endif
 }  // namespace

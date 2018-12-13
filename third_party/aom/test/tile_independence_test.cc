@@ -39,14 +39,12 @@ class TileIndependenceTest
     inv_dec_ = codec_->CreateDecoder(cfg, 0);
     inv_dec_->Control(AV1_INVERT_TILE_DECODE_ORDER, 1);
 
-#if CONFIG_AV1
     if (fw_dec_->IsAV1() && inv_dec_->IsAV1()) {
       fw_dec_->Control(AV1_SET_DECODE_TILE_ROW, -1);
       fw_dec_->Control(AV1_SET_DECODE_TILE_COL, -1);
       inv_dec_->Control(AV1_SET_DECODE_TILE_ROW, -1);
       inv_dec_->Control(AV1_SET_DECODE_TILE_COL, -1);
     }
-#endif
   }
 
   virtual ~TileIndependenceTest() {
@@ -61,7 +59,7 @@ class TileIndependenceTest
 
   virtual void PreEncodeFrameHook(libaom_test::VideoSource *video,
                                   libaom_test::Encoder *encoder) {
-    if (video->frame() == 1) {
+    if (video->frame() == 0) {
       encoder->Control(AV1E_SET_TILE_COLUMNS, n_tile_cols_);
       encoder->Control(AV1E_SET_TILE_ROWS, n_tile_rows_);
       SetCpuUsed(encoder);
@@ -151,7 +149,9 @@ class TileIndependenceLSTest : public TileIndependenceTest {};
 TEST_P(TileIndependenceLSTest, MD5Match) {
   cfg_.large_scale_tile = 1;
   fw_dec_->Control(AV1_SET_TILE_MODE, 1);
+  fw_dec_->Control(AV1D_EXT_TILE_DEBUG, 1);
   inv_dec_->Control(AV1_SET_TILE_MODE, 1);
+  inv_dec_->Control(AV1D_EXT_TILE_DEBUG, 1);
   DoTest();
 }
 
@@ -160,13 +160,14 @@ class TileIndependenceLSTestLarge : public TileIndependenceTestLarge {};
 TEST_P(TileIndependenceLSTestLarge, MD5Match) {
   cfg_.large_scale_tile = 1;
   fw_dec_->Control(AV1_SET_TILE_MODE, 1);
+  fw_dec_->Control(AV1D_EXT_TILE_DEBUG, 1);
   inv_dec_->Control(AV1_SET_TILE_MODE, 1);
+  inv_dec_->Control(AV1D_EXT_TILE_DEBUG, 1);
   DoTest();
 }
 
-AV1_INSTANTIATE_TEST_CASE(TileIndependenceLSTest, ::testing::Values(1, 2, 32),
-                          ::testing::Values(1, 2, 32), ::testing::Values(1));
-AV1_INSTANTIATE_TEST_CASE(TileIndependenceLSTestLarge,
-                          ::testing::Values(1, 2, 32),
-                          ::testing::Values(1, 2, 32), ::testing::Values(1));
+AV1_INSTANTIATE_TEST_CASE(TileIndependenceLSTest, ::testing::Values(6),
+                          ::testing::Values(6), ::testing::Values(1));
+AV1_INSTANTIATE_TEST_CASE(TileIndependenceLSTestLarge, ::testing::Values(6),
+                          ::testing::Values(6), ::testing::Values(1));
 }  // namespace

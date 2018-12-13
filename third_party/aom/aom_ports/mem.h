@@ -9,11 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_PORTS_MEM_H_
-#define AOM_PORTS_MEM_H_
+#ifndef AOM_AOM_PORTS_MEM_H_
+#define AOM_AOM_PORTS_MEM_H_
 
-#include "aom_config.h"
 #include "aom/aom_integer.h"
+#include "config/aom_config.h"
 
 #if (defined(__GNUC__) && __GNUC__) || defined(__SUNPRO_C)
 #define DECLARE_ALIGNED(n, typ, val) typ val __attribute__((aligned(n)))
@@ -66,4 +66,4 @@
 #define CONVERT_TO_SHORTPTR(x) ((uint16_t *)(((uintptr_t)(x)) << 1))
 #define CONVERT_TO_BYTEPTR(x) ((uint8_t *)(((uintptr_t)(x)) >> 1))
 
-#endif  // AOM_PORTS_MEM_H_
+#endif  // AOM_AOM_PORTS_MEM_H_

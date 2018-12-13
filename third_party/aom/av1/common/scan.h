@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_SCAN_H_
-#define AV1_COMMON_SCAN_H_
+#ifndef AOM_AV1_COMMON_SCAN_H_
+#define AOM_AV1_COMMON_SCAN_H_
 
 #include "aom/aom_integer.h"
 #include "aom_ports/mem.h"
@@ -39,13 +39,6 @@ extern const SCAN_ORDER av1_scan_orders[TX_SIZES_ALL][TX_TYPES];
 
 void av1_deliver_eob_threshold(const AV1_COMMON *cm, MACROBLOCKD *xd);
 
-static INLINE int get_coef_context(const int16_t *neighbors,
-                                   const uint8_t *token_cache, int c) {
-  return (1 + token_cache[neighbors[MAX_NEIGHBORS * c + 0]] +
-          token_cache[neighbors[MAX_NEIGHBORS * c + 1]]) >>
-         1;
-}
-
 static INLINE const SCAN_ORDER *get_default_scan(TX_SIZE tx_size,
                                                  TX_TYPE tx_type) {
   return &av1_scan_orders[tx_size][tx_type];
@@ -59,4 +52,4 @@ static INLINE const SCAN_ORDER *get_scan(TX_SIZE tx_size, TX_TYPE tx_type) {
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_SCAN_H_
+#endif  // AOM_AV1_COMMON_SCAN_H_

@@ -9,10 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_DSP_AOM_DSP_COMMON_H_
-#define AOM_DSP_AOM_DSP_COMMON_H_
+#ifndef AOM_AOM_DSP_AOM_DSP_COMMON_H_
+#define AOM_AOM_DSP_AOM_DSP_COMMON_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom/aom_integer.h"
 #include "aom_ports/mem.h"
 
@@ -21,11 +22,7 @@ extern "C" {
 #endif
 
 #ifndef MAX_SB_SIZE
-#if CONFIG_AV1
 #define MAX_SB_SIZE 128
-#else
-#define MAX_SB_SIZE 64
-#endif  // CONFIG_AV1
 #endif  // ndef MAX_SB_SIZE
 
 #define AOMMIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -98,4 +95,4 @@ static INLINE unsigned int negative_to_zero(int value) {
 }  // extern "C"
 #endif
 
-#endif  // AOM_DSP_AOM_DSP_COMMON_H_
+#endif  // AOM_AOM_DSP_AOM_DSP_COMMON_H_

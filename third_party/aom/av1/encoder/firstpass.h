@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_FIRSTPASS_H_
-#define AV1_ENCODER_FIRSTPASS_H_
+#ifndef AOM_AV1_ENCODER_FIRSTPASS_H_
+#define AOM_AV1_ENCODER_FIRSTPASS_H_
 
 #include "av1/common/enums.h"
 #include "av1/common/onyxc_int.h"
@@ -47,15 +47,7 @@ typedef struct {
 //       number of bi-predictive frames.
 #define BFG_INTERVAL 2
 // The maximum number of extra ALTREF's except ALTREF_FRAME
-// NOTE: REF_FRAMES indicates the maximum number of frames that may be buffered
-//       to serve as references. Currently REF_FRAMES == 8.
-#define USE_GF16_MULTI_LAYER 0
-
-#if USE_GF16_MULTI_LAYER
-#define MAX_EXT_ARFS (REF_FRAMES - BWDREF_FRAME)
-#else  // !USE_GF16_MULTI_LAYER
 #define MAX_EXT_ARFS (REF_FRAMES - BWDREF_FRAME - 1)
-#endif  // USE_GF16_MULTI_LAYER
 
 #define MIN_EXT_ARF_INTERVAL 4
 
@@ -70,6 +62,7 @@ typedef struct {
   double frame;
   double weight;
   double intra_error;
+  double frame_avg_wavelet_energy;
   double coded_error;
   double sr_coded_error;
   double pcnt_inter;
@@ -116,17 +109,23 @@ typedef enum {
 
 typedef struct {
   unsigned char index;
-  RATE_FACTOR_LEVEL rf_level[(MAX_LAG_BUFFERS * 2) + 1];
-  FRAME_UPDATE_TYPE update_type[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char arf_src_offset[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char arf_update_idx[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char arf_ref_idx[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char brf_src_offset[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char bidir_pred_enabled[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char ref_fb_idx_map[(MAX_LAG_BUFFERS * 2) + 1][REF_FRAMES];
-  unsigned char refresh_idx[(MAX_LAG_BUFFERS * 2) + 1];
-  unsigned char refresh_flag[(MAX_LAG_BUFFERS * 2) + 1];
-  int bit_allocation[(MAX_LAG_BUFFERS * 2) + 1];
+  RATE_FACTOR_LEVEL rf_level[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  FRAME_UPDATE_TYPE update_type[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char arf_src_offset[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char arf_update_idx[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char arf_ref_idx[MAX_STATIC_GF_GROUP_LENGTH + 1];
+#if USE_SYMM_MULTI_LAYER
+  unsigned char arf_pos_in_gf[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char pyramid_level[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char pyramid_height;
+  unsigned char pyramid_lvl_nodes[MAX_PYRAMID_LVL];
+#endif  // USE_SYMM_MULTI_LAYER
+  unsigned char brf_src_offset[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char bidir_pred_enabled[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char ref_fb_idx_map[MAX_STATIC_GF_GROUP_LENGTH + 1][REF_FRAMES];
+  unsigned char refresh_idx[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  unsigned char refresh_flag[MAX_STATIC_GF_GROUP_LENGTH + 1];
+  int bit_allocation[MAX_STATIC_GF_GROUP_LENGTH + 1];
 } GF_GROUP;
 
 typedef struct {
@@ -143,6 +142,7 @@ typedef struct {
   double modified_error_max;
   double modified_error_left;
   double mb_av_energy;
+  double frame_avg_haar_energy;
 
 #if CONFIG_FP_MB_STATS
   uint8_t *frame_mb_stats_buf;
@@ -184,13 +184,11 @@ void av1_end_first_pass(struct AV1_COMP *cpi);
 
 void av1_init_second_pass(struct AV1_COMP *cpi);
 void av1_rc_get_second_pass_params(struct AV1_COMP *cpi);
+void av1_configure_buffer_updates_firstpass(struct AV1_COMP *cpi,
+                                            FRAME_UPDATE_TYPE update_type);
 
 // Post encode update of the rate control parameters for 2-pass
 void av1_twopass_postencode_update(struct AV1_COMP *cpi);
-
-#if USE_GF16_MULTI_LAYER
-void av1_ref_frame_map_idx_updates(struct AV1_COMP *cpi, int gf_frame_index);
-#endif  // USE_GF16_MULTI_LAYER
 
 static INLINE int get_number_of_extra_arfs(int interval, int arf_pending) {
   if (arf_pending && MAX_EXT_ARFS > 0)
@@ -207,4 +205,4 @@ static INLINE int get_number_of_extra_arfs(int interval, int arf_pending) {
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_FIRSTPASS_H_
+#endif  // AOM_AV1_ENCODER_FIRSTPASS_H_

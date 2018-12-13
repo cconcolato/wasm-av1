@@ -14,14 +14,29 @@
 //
 // This is an example of a simple lightfield decoder. It builds upon the
 // simple_decoder.c example.  It takes an input file containing the compressed
-// data (in webm format), treating it as a lightfield instead of a video and
-// will decode a single lightfield tile. The lf_width and lf_height arguments
-// are the number of lightfield images in each dimension. The tile to decode
-// is specified by the tile_u, tile_v, tile_s, tile_t arguments. The tile_u,
-// tile_v specify the image and tile_s, tile_t specify the tile in the image.
+// data (in ivf format), treating it as a lightfield instead of a video; and a
+// text file with a list of tiles to decode. There is an option allowing to
+// choose the output format, and the supported formats are i420(default) and
+// nv12.
 // After running the lightfield encoder, run lightfield decoder to decode a
-// single tile:
-// examples/lightfield_decoder vase10x10.webm vase_tile.yuv 10 10 3 4 5 10 5
+// batch of tiles:
+// examples/lightfield_decoder vase10x10.ivf vase_reference.yuv 4 tile_list.txt
+// or
+// examples/lightfield_decoder vase10x10.ivf vase_reference.yuv 4 tile_list.txt
+// 1
+// if nv12 output format is preferred.
+// The tile_list.txt is expected to be of the form:
+// Frame <frame_index0>
+// <image_index0> <anchor_index0> <tile_col0> <tile_row0>
+// <image_index1> <anchor_index1> <tile_col1> <tile_row1>
+// ...
+// Frame <frame_index1)
+// ...
+//
+// The "Frame" markers indicate a new render frame and thus a new tile list
+// will be started and the old one flushed.  The image_indexN, anchor_indexN,
+// tile_colN, and tile_rowN identify an individual tile to be decoded and
+// to use anchor_indexN anchor image for MCP.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,68 +44,133 @@
 
 #include "aom/aom_decoder.h"
 #include "aom/aomdx.h"
-
-#include "../tools_common.h"
-#include "../video_reader.h"
-#include "./aom_config.h"
+#include "aom_scale/yv12config.h"
+#include "av1/common/enums.h"
+#include "common/tools_common.h"
+#include "common/video_reader.h"
 
 static const char *exec_name;
 
+#define I420 0
+#define NV12 1
+
 void usage_exit(void) {
   fprintf(stderr,
-          "Usage: %s <infile> <outfile> <lf_width> <lf_height> <tlie_u>"
-          " <tile_v> <tile_s> <tile_t> <lf_blocksize>\n",
+          "Usage: %s <infile> <outfile> <num_references> <tile_list> <output "
+          "format(optional)>\n",
           exec_name);
   exit(EXIT_FAILURE);
 }
 
-aom_image_t *aom_img_copy(aom_image_t *src, aom_image_t *dst) {
-  dst = aom_img_alloc(dst, src->fmt, src->d_w, src->d_h, 16);
+// Output frame size
+const int output_frame_width = 512;
+const int output_frame_height = 512;
 
+static void aom_img_copy_tile(const aom_image_t *src, const aom_image_t *dst,
+                              int dst_row_offset, int dst_col_offset) {
+  const int shift = (src->fmt & AOM_IMG_FMT_HIGHBITDEPTH) ? 1 : 0;
   int plane;
 
   for (plane = 0; plane < 3; ++plane) {
-    uint8_t *src_buf = src->planes[plane];
+    const unsigned char *src_buf = src->planes[plane];
     const int src_stride = src->stride[plane];
-    const int src_w = plane == 0 ? src->d_w : src->d_w >> 1;
-    const int src_h = plane == 0 ? src->d_h : src->d_h >> 1;
-
-    uint8_t *dst_buf = dst->planes[plane];
+    unsigned char *dst_buf = dst->planes[plane];
     const int dst_stride = dst->stride[plane];
+    const int roffset =
+        (plane > 0) ? dst_row_offset >> dst->y_chroma_shift : dst_row_offset;
+    const int coffset =
+        (plane > 0) ? dst_col_offset >> dst->x_chroma_shift : dst_col_offset;
+
+    // col offset needs to be adjusted for HBD.
+    dst_buf += roffset * dst_stride + (coffset << shift);
+
+    const int w = (aom_img_plane_width(src, plane) << shift);
+    const int h = aom_img_plane_height(src, plane);
     int y;
 
-    for (y = 0; y < src_h; ++y) {
-      memcpy(dst_buf, src_buf, src_w);
+    for (y = 0; y < h; ++y) {
+      memcpy(dst_buf, src_buf, w);
       src_buf += src_stride;
       dst_buf += dst_stride;
     }
   }
-  return dst;
+}
+
+void decode_tile(aom_codec_ctx_t *codec, const unsigned char *frame,
+                 size_t frame_size, int tr, int tc, int ref_idx,
+                 aom_image_t *reference_images, aom_image_t *output,
+                 int *tile_idx, unsigned int *output_bit_depth) {
+  aom_codec_control_(codec, AV1_SET_TILE_MODE, 1);
+  aom_codec_control_(codec, AV1D_EXT_TILE_DEBUG, 1);
+  aom_codec_control_(codec, AV1_SET_DECODE_TILE_ROW, tr);
+  aom_codec_control_(codec, AV1_SET_DECODE_TILE_COL, tc);
+
+  av1_ref_frame_t ref;
+  ref.idx = 0;
+  ref.use_external_ref = 1;
+  ref.img = reference_images[ref_idx];
+  if (aom_codec_control(codec, AV1_SET_REFERENCE, &ref)) {
+    die_codec(codec, "Failed to set reference frame.");
+  }
+
+  aom_codec_err_t aom_status = aom_codec_decode(codec, frame, frame_size, NULL);
+  if (aom_status) die_codec(codec, "Failed to decode tile.");
+
+  aom_codec_iter_t iter = NULL;
+  aom_image_t *img = aom_codec_get_frame(codec, &iter);
+  if (!img) die_codec(codec, "Failed to get frame.");
+
+  // aom_img_alloc() sets bit_depth as follows:
+  // output->bit_depth = (fmt & AOM_IMG_FMT_HIGHBITDEPTH) ? 16 : 8;
+  // Use img->bit_depth(read from bitstream), so that aom_shift_img()
+  // works as expected.
+  output->bit_depth = img->bit_depth;
+  *output_bit_depth = img->bit_depth;
+
+  // read out the tile size.
+  unsigned int tile_size = 0;
+  if (aom_codec_control(codec, AV1D_GET_TILE_SIZE, &tile_size))
+    die_codec(codec, "Failed to get the tile size");
+  const unsigned int tile_width = tile_size >> 16;
+  const unsigned int tile_height = tile_size & 65535;
+  const uint8_t output_frame_width_in_tiles = output_frame_width / tile_width;
+
+  // Copy the tile to the output frame.
+  const int row_offset =
+      (*tile_idx / output_frame_width_in_tiles) * tile_height;
+  const int col_offset = (*tile_idx % output_frame_width_in_tiles) * tile_width;
+
+  aom_img_copy_tile(img, output, row_offset, col_offset);
+  (*tile_idx)++;
+}
+
+static void img_write_to_file(const aom_image_t *img, FILE *file,
+                              int output_format) {
+  if (output_format == I420)
+    aom_img_write(img, file);
+  else  // NV12
+    aom_img_write_nv12(img, file);
 }
 
 int main(int argc, char **argv) {
-  int frame_cnt = 0;
   FILE *outfile = NULL;
   aom_codec_ctx_t codec;
   AvxVideoReader *reader = NULL;
   const AvxInterface *decoder = NULL;
   const AvxVideoInfo *info = NULL;
-  const char *lf_width_arg;
-  const char *lf_height_arg;
-  const char *tile_u_arg;
-  const char *tile_v_arg;
-  const char *tile_s_arg;
-  const char *tile_t_arg;
-  const char *lf_blocksize_arg;
-  int lf_width, lf_height;
-  int tile_u, tile_v, tile_s, tile_t;
-  int lf_blocksize;
-  int u_blocks;
-  int v_blocks;
-
+  int num_references;
+  aom_img_fmt_t ref_fmt = 0;
+  aom_image_t reference_images[MAX_EXTERNAL_REFERENCES];
+  aom_image_t output;
+  aom_image_t *output_shifted = NULL;
+  size_t frame_size = 0;
+  const unsigned char *frame = NULL;
+  int i, j;
+  const char *tile_list_file = NULL;
+  int output_format = I420;
   exec_name = argv[0];
 
-  if (argc != 10) die("Invalid number of arguments.");
+  if (argc < 5) die("Invalid number of arguments.");
 
   reader = aom_video_reader_open(argv[1]);
   if (!reader) die("Failed to open %s for reading.", argv[1]);
@@ -98,94 +178,169 @@ int main(int argc, char **argv) {
   if (!(outfile = fopen(argv[2], "wb")))
     die("Failed to open %s for writing.", argv[2]);
 
-  lf_width_arg = argv[3];
-  lf_height_arg = argv[4];
-  tile_u_arg = argv[5];
-  tile_v_arg = argv[6];
-  tile_s_arg = argv[7];
-  tile_t_arg = argv[8];
-  lf_blocksize_arg = argv[9];
-  lf_width = (int)strtol(lf_width_arg, NULL, 0);
-  lf_height = (int)strtol(lf_height_arg, NULL, 0);
-  tile_u = (int)strtol(tile_u_arg, NULL, 0);
-  tile_v = (int)strtol(tile_v_arg, NULL, 0);
-  tile_s = (int)strtol(tile_s_arg, NULL, 0);
-  tile_t = (int)strtol(tile_t_arg, NULL, 0);
-  lf_blocksize = (int)strtol(lf_blocksize_arg, NULL, 0);
+  num_references = (int)strtol(argv[3], NULL, 0);
+  tile_list_file = argv[4];
+
+  if (argc > 5) output_format = (int)strtol(argv[5], NULL, 0);
 
   info = aom_video_reader_get_info(reader);
 
   decoder = get_aom_decoder_by_fourcc(info->codec_fourcc);
   if (!decoder) die("Unknown input codec.");
-
   printf("Using %s\n", aom_codec_iface_name(decoder->codec_interface()));
 
   if (aom_codec_dec_init(&codec, decoder->codec_interface(), NULL, 0))
     die_codec(&codec, "Failed to initialize decoder.");
-  // Decode reference frames.
-  aom_codec_control_(&codec, AV1_SET_TILE_MODE, 0);
-  // How many reference images we need to encode.
-  u_blocks = (lf_width + lf_blocksize - 1) / lf_blocksize;
-  v_blocks = (lf_height + lf_blocksize - 1) / lf_blocksize;
-  aom_image_t *reference_images =
-      (aom_image_t *)malloc(u_blocks * v_blocks * sizeof(aom_image_t));
-  for (int bv = 0; bv < v_blocks; ++bv) {
-    for (int bu = 0; bu < u_blocks; ++bu) {
-      aom_video_reader_read_frame(reader);
-      aom_codec_iter_t iter = NULL;
-      aom_image_t *img = NULL;
-      size_t frame_size = 0;
-      const unsigned char *frame =
-          aom_video_reader_get_frame(reader, &frame_size);
-      if (aom_codec_decode(&codec, frame, frame_size, NULL))
-        die_codec(&codec, "Failed to decode frame.");
 
-      while ((img = aom_codec_get_frame(&codec, &iter)) != NULL) {
-        aom_img_copy(img, &reference_images[bu + bv * u_blocks]);
-        char name[1024];
-        snprintf(name, sizeof(name), "ref_%d_%d.yuv", bu, bv);
-        printf("writing ref image to %s, %d, %d\n", name, img->d_w, img->d_h);
-        FILE *ref_file = fopen(name, "wb");
-        aom_img_write(img, ref_file);
-        fclose(ref_file);
-        ++frame_cnt;
+  if (aom_codec_control(&codec, AV1D_SET_IS_ANNEXB, info->is_annexb)) {
+    die("Failed to set annex b status");
+  }
+
+  // Decode anchor frames.
+  aom_codec_control_(&codec, AV1_SET_TILE_MODE, 0);
+  for (i = 0; i < num_references; ++i) {
+    aom_video_reader_read_frame(reader);
+    frame = aom_video_reader_get_frame(reader, &frame_size);
+    if (aom_codec_decode(&codec, frame, frame_size, NULL))
+      die_codec(&codec, "Failed to decode frame.");
+
+    if (i == 0) {
+      if (aom_codec_control(&codec, AV1D_GET_IMG_FORMAT, &ref_fmt))
+        die_codec(&codec, "Failed to get the image format");
+
+      int frame_res[2];
+      if (aom_codec_control(&codec, AV1D_GET_FRAME_SIZE, frame_res))
+        die_codec(&codec, "Failed to get the image frame size");
+
+      // Allocate memory to store decoded references. Allocate memory with the
+      // border so that it can be used as a reference.
+      for (j = 0; j < num_references; j++) {
+        unsigned int border = AOM_BORDER_IN_PIXELS;
+        if (!aom_img_alloc_with_border(&reference_images[j], ref_fmt,
+                                       frame_res[0], frame_res[1], 32, 8,
+                                       border)) {
+          die("Failed to allocate references.");
+        }
       }
+    }
+
+    if (aom_codec_control(&codec, AV1_COPY_NEW_FRAME_IMAGE,
+                          &reference_images[i]))
+      die_codec(&codec, "Failed to copy decoded reference frame");
+
+    aom_codec_iter_t iter = NULL;
+    aom_image_t *img = NULL;
+    while ((img = aom_codec_get_frame(&codec, &iter)) != NULL) {
+      char name[1024];
+      snprintf(name, sizeof(name), "ref_%d.yuv", i);
+      printf("writing ref image to %s, %d, %d\n", name, img->d_w, img->d_h);
+      FILE *ref_file = fopen(name, "wb");
+      aom_img_write(img, ref_file);
+      fclose(ref_file);
     }
   }
 
-  int decode_frame_index = tile_v * lf_width + tile_u;
-  do {
-    aom_video_reader_read_frame(reader);
-  } while (frame_cnt++ != decode_frame_index);
-  size_t frame_size = 0;
-  const unsigned char *frame = aom_video_reader_get_frame(reader, &frame_size);
+  FILE *infile = aom_video_reader_get_file(reader);
+  // Record the offset of the first camera image.
+  const FileOffset camera_frame_pos = ftello(infile);
 
-  int ref_bu = tile_u / lf_blocksize;
-  int ref_bv = tile_v / lf_blocksize;
-  int ref_bi = ref_bu + ref_bv * u_blocks;
-  av1_ref_frame_t ref;
-  ref.idx = 0;
-  ref.img = reference_images[ref_bi];
-  // This is too slow for real lightfield rendering.  This copies the
-  // reference image bytes.  We need a way to just set a pointer
-  // in order to make this fast enough.
-  if (aom_codec_control(&codec, AV1_SET_REFERENCE, &ref)) {
-    die_codec(&codec, "Failed to set reference image.");
+  printf("Loading compressed frames into memory.\n");
+
+  // Count the frames in the lightfield.
+  int num_frames = 0;
+  while (aom_video_reader_read_frame(reader)) {
+    ++num_frames;
   }
-  aom_codec_control_(&codec, AV1_SET_TILE_MODE, 1);
-  aom_codec_control_(&codec, AV1_SET_DECODE_TILE_ROW, tile_t);
-  aom_codec_control_(&codec, AV1_SET_DECODE_TILE_COL, tile_s);
-  aom_codec_err_t aom_status =
-      aom_codec_decode(&codec, frame, frame_size, NULL);
-  if (aom_status) die_codec(&codec, "Failed to decode tile.");
-  aom_codec_iter_t iter = NULL;
-  aom_image_t *img = aom_codec_get_frame(&codec, &iter);
-  aom_img_write(img, outfile);
+  if (num_frames < 1) die("Input light field has no frames.");
 
-  free(reference_images);
+  // Read all of the lightfield frames into memory.
+  unsigned char **frames =
+      (unsigned char **)malloc(num_frames * sizeof(unsigned char *));
+  size_t *frame_sizes = (size_t *)malloc(num_frames * sizeof(size_t));
+  // Seek to the first camera image.
+  fseeko(infile, camera_frame_pos, SEEK_SET);
+  for (int f = 0; f < num_frames; ++f) {
+    aom_video_reader_read_frame(reader);
+    frame = aom_video_reader_get_frame(reader, &frame_size);
+    frames[f] = (unsigned char *)malloc(frame_size * sizeof(unsigned char));
+    memcpy(frames[f], frame, frame_size);
+    frame_sizes[f] = frame_size;
+  }
+  printf("Read %d frames.\n", num_frames);
+
+  // Allocate the output frame.
+  aom_img_fmt_t out_fmt = ref_fmt;
+  if (!CONFIG_LOWBITDEPTH) out_fmt |= AOM_IMG_FMT_HIGHBITDEPTH;
+  if (!aom_img_alloc(&output, out_fmt, output_frame_width, output_frame_height,
+                     32))
+    die("Failed to allocate output image.");
+
+  printf("Decoding tile list from file.\n");
+  char line[1024];
+  FILE *tile_list_fptr = fopen(tile_list_file, "r");
+  int tile_list_cnt = 0;
+  int tile_list_writes = 0;
+  int tile_idx = 0;
+  aom_image_t *out = NULL;
+  unsigned int output_bit_depth = 0;
+
+  while ((fgets(line, 1024, tile_list_fptr)) != NULL) {
+    if (line[0] == 'F') {
+      // Write out the tile list.
+      if (tile_list_cnt) {
+        out = &output;
+        // Shift up or down if necessary
+        if (output_bit_depth != 0)
+          aom_shift_img(output_bit_depth, &out, &output_shifted);
+        img_write_to_file(out, outfile, output_format);
+        tile_list_writes++;
+      }
+
+      tile_list_cnt++;
+      tile_idx = 0;
+      // Then memset the frame.
+      memset(output.img_data, 0, output.sz);
+      continue;
+    }
+
+    int image_idx, ref_idx, tc, tr;
+    sscanf(line, "%d %d %d %d", &image_idx, &ref_idx, &tc, &tr);
+    if (image_idx >= num_frames) {
+      die("Tile list image_idx out of bounds: %d >= %d.", image_idx,
+          num_frames);
+    }
+    if (ref_idx >= num_references) {
+      die("Tile list ref_idx out of bounds: %d >= %d.", ref_idx,
+          num_references);
+    }
+    frame = frames[image_idx];
+    frame_size = frame_sizes[image_idx];
+    decode_tile(&codec, frame, frame_size, tr, tc, ref_idx, reference_images,
+                &output, &tile_idx, &output_bit_depth);
+  }
+
+  // Write out the last tile list.
+  if (tile_list_writes < tile_list_cnt) {
+    out = &output;
+    // Shift up or down if necessary
+    if (output_bit_depth != 0)
+      aom_shift_img(output_bit_depth, &out, &output_shifted);
+    img_write_to_file(out, outfile, output_format);
+  }
+
+  if (output_shifted) aom_img_free(output_shifted);
+  aom_img_free(&output);
+  for (i = 0; i < num_references; i++) aom_img_free(&reference_images[i]);
+  for (int f = 0; f < num_frames; ++f) {
+    free(frames[f]);
+  }
+  free(frame_sizes);
+  free(frames);
   if (aom_codec_destroy(&codec)) die_codec(&codec, "Failed to destroy codec");
   aom_video_reader_close(reader);
   fclose(outfile);
 
   return EXIT_SUCCESS;
 }
+#undef I420
+#undef NV12

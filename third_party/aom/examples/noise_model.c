@@ -18,24 +18,45 @@
  *
  * The --output-grain-table file can be passed as input to the encoder (in
  * aomenc this is done through the "--film-grain-table" parameter).
+ *
+ * As an example, where the input source is an 854x480 yuv420p 8-bit video
+ * named "input.854_480.yuv" you would use steps similar to the following:
+ *
+ * # Run your denoiser (e.g, using hqdn3d filter):
+ * ffmpeg -vcodec rawvideo -video_size 854x480 -i input.854_480.yuv \
+ *    -vf hqdn3d=5:5:5:5 -vcodec rawvideo -an -f rawvideo \
+ *    denoised.854_480.yuv
+ *
+ * # Model the noise between the denoised version and original source:
+ * ./examples/noise_model --fps=25/1 --width=854 --height=480 --i420 \
+ *    --input-denoised=denoised.854_480.yuv --input=original.854_480.yuv \
+ *    --output-grain-table=film_grain.tbl
+ *
+ * # Encode with your favorite settings (including the grain table):
+ * aomenc --limit=100  --cpu-used=4 --input-bit-depth=8                  \
+ *    --i420 -w 854 -h 480 --end-usage=q --cq-level=25 --lag-in-frames=25 \
+ *    --auto-alt-ref=2 --bit-depth=8 --film-grain-table=film_grain.tbl \
+ *    -o denoised_with_grain_params.ivf denoised.854_480.yuv
  */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "../args.h"
-#include "../tools_common.h"
-#include "../video_writer.h"
 #include "aom/aom_encoder.h"
 #include "aom_dsp/aom_dsp_common.h"
+
 #if CONFIG_AV1_DECODER
 #include "aom_dsp/grain_synthesis.h"
 #endif
+
 #include "aom_dsp/grain_table.h"
 #include "aom_dsp/noise_model.h"
 #include "aom_dsp/noise_util.h"
 #include "aom_mem/aom_mem.h"
+#include "common/args.h"
+#include "common/tools_common.h"
+#include "common/video_writer.h"
 
 static const char *exec_name;
 
@@ -93,7 +114,7 @@ typedef struct {
   const char *debug_file;
 } noise_model_args_t;
 
-void parse_args(noise_model_args_t *noise_args, int *argc, char **argv) {
+static void parse_args(noise_model_args_t *noise_args, int *argc, char **argv) {
   struct arg arg;
   static const arg_def_t *main_args[] = { &help,
                                           &input_arg,
@@ -158,9 +179,14 @@ static void print_variance_y(FILE *debug_file, aom_image_t *raw,
                              int block_size, aom_film_grain_t *grain) {
   aom_image_t renoised;
   grain->apply_grain = 1;
-  grain->random_seed = 1071;
+  grain->random_seed = 7391;
   aom_img_alloc(&renoised, raw->fmt, raw->w, raw->h, 1);
-  av1_add_film_grain(grain, denoised, &renoised);
+
+  if (av1_add_film_grain(grain, denoised, &renoised)) {
+    fprintf(stderr, "Internal failure in av1_add_film_grain().\n");
+    aom_img_free(&renoised);
+    return;
+  }
 
   const int num_blocks_w = (raw->w + block_size - 1) / block_size;
   const int num_blocks_h = (raw->h + block_size - 1) / block_size;
@@ -259,7 +285,7 @@ static void print_debug_info(FILE *debug_file, aom_image_t *raw,
 }
 
 int main(int argc, char *argv[]) {
-  noise_model_args_t args = { 0,  0, { 1, 25 }, 0, 0, 0,   AOM_IMG_FMT_I420,
+  noise_model_args_t args = { 0,  0, { 25, 1 }, 0, 0, 0,   AOM_IMG_FMT_I420,
                               32, 8, 1,         0, 1, NULL };
   aom_image_t raw, denoised;
   FILE *infile = NULL;
@@ -303,7 +329,7 @@ int main(int argc, char *argv[]) {
   const int num_blocks_h = (info.frame_height + block_size - 1) / block_size;
   uint8_t *flat_blocks = (uint8_t *)aom_malloc(num_blocks_w * num_blocks_h);
   // Sets the random seed on the first entry in the output table
-  int16_t random_seed = 1071;
+  int16_t random_seed = 7391;
   aom_noise_model_t noise_model;
   aom_noise_model_params_t params = { AOM_NOISE_SHAPE_SQUARE, 3, args.bit_depth,
                                       high_bd };

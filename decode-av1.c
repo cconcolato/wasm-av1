@@ -32,7 +32,7 @@
 
 #include "decode-av1-priv.h"
 
-#include "video_common.h"
+#include "common/video_common.h"
 
 struct AVX_Decoder {
     AvxVideoInfo        ad_Info;        /**< Codec defined video info       */

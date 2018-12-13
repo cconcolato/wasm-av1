@@ -9,10 +9,10 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_PORTS_AOM_TIMER_H_
-#define AOM_PORTS_AOM_TIMER_H_
+#ifndef AOM_AOM_PORTS_AOM_TIMER_H_
+#define AOM_AOM_PORTS_AOM_TIMER_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
 
 #include "aom/aom_integer.h"
 
@@ -108,4 +108,4 @@ static INLINE int aom_usec_timer_elapsed(struct aom_usec_timer *t) {
 
 #endif /* CONFIG_OS_SUPPORT */
 
-#endif  // AOM_PORTS_AOM_TIMER_H_
+#endif  // AOM_AOM_PORTS_AOM_TIMER_H_

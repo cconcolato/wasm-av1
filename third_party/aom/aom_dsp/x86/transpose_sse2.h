@@ -9,12 +9,12 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_DSP_X86_TRANSPOSE_SSE2_H_
-#define AOM_DSP_X86_TRANSPOSE_SSE2_H_
+#ifndef AOM_AOM_DSP_X86_TRANSPOSE_SSE2_H_
+#define AOM_AOM_DSP_X86_TRANSPOSE_SSE2_H_
 
 #include <emmintrin.h>  // SSE2
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
 
 static INLINE __m128i transpose_8bit_4x4(const __m128i *const in) {
   // Unpack 16 bit elements. Goes from:
@@ -417,4 +417,4 @@ static INLINE void transpose_32bit_8x4(const __m128i *const in,
   out[7] = _mm_unpackhi_epi64(a6, a7);
 }
 
-#endif  // AOM_DSP_X86_TRANSPOSE_SSE2_H_
+#endif  // AOM_AOM_DSP_X86_TRANSPOSE_SSE2_H_

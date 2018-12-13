@@ -58,6 +58,7 @@ void DecoderTest::RunLoop(CompressedVideoSource *video,
   Decoder *const decoder = codec_->CreateDecoder(dec_cfg, flags_);
   ASSERT_TRUE(decoder != NULL);
   bool end_of_file = false;
+  bool peeked_stream = false;
 
   // Decode frames.
   for (video->Begin(); !::testing::Test::HasFailure() && !end_of_file;
@@ -65,15 +66,23 @@ void DecoderTest::RunLoop(CompressedVideoSource *video,
     PreDecodeFrameHook(*video, decoder);
 
     aom_codec_stream_info_t stream_info;
+    stream_info.is_annexb = 0;
+
     if (video->cxdata() != NULL) {
-      const aom_codec_err_t res_peek = decoder->PeekStream(
-          video->cxdata(), video->frame_size(), &stream_info);
-      HandlePeekResult(decoder, video, res_peek);
-      ASSERT_FALSE(::testing::Test::HasFailure());
+      if (!peeked_stream) {
+        // TODO(yaowu): PeekStream returns error for non-sequence_header_obu,
+        // therefore should only be tried once per sequence, this shall be fixed
+        // once PeekStream is updated to properly operate on other obus.
+        const aom_codec_err_t res_peek = decoder->PeekStream(
+            video->cxdata(), video->frame_size(), &stream_info);
+        HandlePeekResult(decoder, video, res_peek);
+        ASSERT_FALSE(::testing::Test::HasFailure());
+        peeked_stream = true;
+      }
 
       aom_codec_err_t res_dec =
           decoder->DecodeFrame(video->cxdata(), video->frame_size());
-      if (!HandleDecodeResult(res_dec, decoder)) break;
+      if (!HandleDecodeResult(res_dec, *video, decoder)) break;
     } else {
       // Signal end of the file to the decoder.
       const aom_codec_err_t res_dec = decoder->DecodeFrame(NULL, 0);
@@ -85,7 +94,7 @@ void DecoderTest::RunLoop(CompressedVideoSource *video,
     const aom_image_t *img = NULL;
 
     // Get decompressed data
-    while ((img = dec_iter.Next()))
+    while (!::testing::Test::HasFailure() && (img = dec_iter.Next()))
       DecompressedFrameHook(*img, video->frame_number());
   }
   delete decoder;

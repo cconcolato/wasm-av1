@@ -9,12 +9,13 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_DSP_MIPS_AOM_COMMON_DSPR2_H_
-#define AOM_DSP_MIPS_AOM_COMMON_DSPR2_H_
+#ifndef AOM_AOM_DSP_MIPS_CONVOLVE_COMMON_DSPR2_H_
+#define AOM_AOM_DSP_MIPS_CONVOLVE_COMMON_DSPR2_H_
 
 #include <assert.h>
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom/aom_integer.h"
 #include "aom_dsp/mips/common_dspr2.h"
 
@@ -44,4 +45,4 @@ void aom_convolve2_vert_dspr2(const uint8_t *src, ptrdiff_t src_stride,
 }  // extern "C"
 #endif
 
-#endif  // AOM_DSP_MIPS_AOM_COMMON_DSPR2_H_
+#endif  // AOM_AOM_DSP_MIPS_CONVOLVE_COMMON_DSPR2_H_

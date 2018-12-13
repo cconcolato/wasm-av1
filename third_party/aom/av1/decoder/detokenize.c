@@ -9,7 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/mem.h"
 #include "av1/common/blockd.h"
@@ -65,7 +66,8 @@ void av1_decode_palette_tokens(MACROBLOCKD *const xd, int plane,
                                aom_reader *r) {
   assert(plane == 0 || plane == 1);
   Av1ColorMapParam params;
-  params.color_map = xd->plane[plane].color_index_map;
+  params.color_map =
+      xd->plane[plane].color_index_map + xd->color_index_map_offset[plane];
   params.map_cdf = plane ? xd->tile_ctx->palette_uv_color_index_cdf
                          : xd->tile_ctx->palette_y_color_index_cdf;
   const MB_MODE_INFO *const mbmi = xd->mi[0];

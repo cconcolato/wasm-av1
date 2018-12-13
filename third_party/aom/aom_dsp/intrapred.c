@@ -12,8 +12,8 @@
 #include <assert.h>
 #include <math.h>
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/intrapred_common.h"
@@ -239,23 +239,23 @@ static INLINE int divide_using_multiply_shift(int num, int shift1,
   return interm * multiplier >> shift2;
 }
 
-  // The constants (multiplier and shifts) for a given block size are obtained
-  // as follows:
-  // - Let sum_w_h =  block width + block height.
-  // - Shift 'sum_w_h' right until we reach an odd number. Let the number of
-  // shifts for that block size be called 'shift1' (see the parameter in
-  // dc_predictor_rect() function), and let the odd number be 'd'. [d has only 2
-  // possible values: d = 3 for a 1:2 rect block and d = 5 for a 1:4 rect
-  // block].
-  // - Find multipliers for (i) dividing by 3, and (ii) dividing by 5,
-  // using the "Algorithm 1" in:
-  // http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=1467632
-  // by ensuring that m + n = 16 (in that algorithm). This ensures that our 2nd
-  // shift will be 16, regardless of the block size.
+// The constants (multiplier and shifts) for a given block size are obtained
+// as follows:
+// - Let sum_w_h =  block width + block height.
+// - Shift 'sum_w_h' right until we reach an odd number. Let the number of
+// shifts for that block size be called 'shift1' (see the parameter in
+// dc_predictor_rect() function), and let the odd number be 'd'. [d has only 2
+// possible values: d = 3 for a 1:2 rect block and d = 5 for a 1:4 rect
+// block].
+// - Find multipliers for (i) dividing by 3, and (ii) dividing by 5,
+// using the "Algorithm 1" in:
+// http://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=1467632
+// by ensuring that m + n = 16 (in that algorithm). This ensures that our 2nd
+// shift will be 16, regardless of the block size.
 
-  // Note: For low bitdepth, assembly code may be optimized by using smaller
-  // constants for smaller block sizes, where the range of the 'sum' is
-  // restricted to fewer bits.
+// Note: For low bitdepth, assembly code may be optimized by using smaller
+// constants for smaller block sizes, where the range of the 'sum' is
+// restricted to fewer bits.
 
 #define DC_MULTIPLIER_1X2 0x5556
 #define DC_MULTIPLIER_1X4 0x3334
@@ -764,18 +764,14 @@ void aom_highbd_dc_predictor_64x32_c(uint16_t *dst, ptrdiff_t stride,
   intra_pred_highbd_sized(type, 64, 64) \
   intra_pred_rectangular(type)
 #define intra_pred_allsizes(type) \
-  intra_pred_sized(type, 2, 2) \
   intra_pred_sized(type, 4, 4) \
-  intra_pred_highbd_sized(type, 2, 2) \
   intra_pred_above_4x4(type)
 #define intra_pred_square(type) \
-  intra_pred_sized(type, 2, 2) \
   intra_pred_sized(type, 4, 4) \
   intra_pred_sized(type, 8, 8) \
   intra_pred_sized(type, 16, 16) \
   intra_pred_sized(type, 32, 32) \
   intra_pred_sized(type, 64, 64) \
-  intra_pred_highbd_sized(type, 2, 2) \
   intra_pred_highbd_sized(type, 4, 4) \
   intra_pred_highbd_sized(type, 8, 8) \
   intra_pred_highbd_sized(type, 16, 16) \

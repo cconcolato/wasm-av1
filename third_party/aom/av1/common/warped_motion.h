@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_WARPED_MOTION_H_
-#define AV1_COMMON_WARPED_MOTION_H_
+#ifndef AOM_AV1_COMMON_WARPED_MOTION_H_
+#define AOM_AV1_COMMON_WARPED_MOTION_H_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +18,8 @@
 #include <math.h>
 #include <assert.h>
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom_ports/mem.h"
 #include "aom_dsp/aom_dsp_common.h"
 #include "av1/common/mv.h"
@@ -67,11 +68,6 @@ static const uint8_t warp_pad_right[14][16] = {
   { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }
 };
 
-void project_points_affine(const int32_t *mat, int *points, int *proj,
-                           const int n, const int stride_points,
-                           const int stride_proj, const int subsampling_x,
-                           const int subsampling_y);
-
 // Returns the error between the result of applying motion 'wm' to the frame
 // described by 'ref' and the frame described by 'dst'.
 int64_t av1_warp_error(WarpedMotionParams *wm, int use_hbd, int bd,
@@ -96,4 +92,4 @@ int find_projection(int np, int *pts1, int *pts2, BLOCK_SIZE bsize, int mvy,
                     int mi_col);
 
 int get_shear_params(WarpedMotionParams *wm);
-#endif  // AV1_COMMON_WARPED_MOTION_H_
+#endif  // AOM_AV1_COMMON_WARPED_MOTION_H_

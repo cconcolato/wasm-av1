@@ -18,50 +18,10 @@ if(NOT EMSCRIPTEN)
   endif()
 endif()
 
-option(ENABLE_CCACHE "Enable ccache support." OFF)
-option(ENABLE_DISTCC "Enable distcc support." OFF)
-option(ENABLE_DOCS "Enable documentation generation (doxygen required)." ON)
-option(ENABLE_EXAMPLES "Enables build of example code." ON)
-option(ENABLE_GOMA "Enable goma support." OFF)
-option(ENABLE_IDE_TEST_HOSTING
-       "Enables running tests within IDEs like Visual Studio and Xcode." OFF)
-option(ENABLE_NASM "Use nasm instead of yasm for x86 assembly." OFF)
-option(ENABLE_TOOLS "Enable applications in tools sub directory." ON)
-option(ENABLE_WERROR "Converts warnings to errors at compile time." OFF)
-
-# ARM assembly/intrinsics flags.
-option(ENABLE_NEON "Enables NEON optimizations on ARM targets." ON)
-option(ENABLE_NEON_ASM "Enables NEON ASM optimizations on ARM targets." ON)
-
-# MIPS assembly/intrinsics flags.
-option(ENABLE_DSPR2 "Enables DSPR2 optimizations on MIPS targets." OFF)
-option(ENABLE_MSA "Enables MSA optimizations on MIPS targets." OFF)
-
-# VSX intrinsics flags.
-option(ENABLE_VSX "Enables VSX optimizations on PowerPC targets." ON)
-
-# x86/x86_64 assembly/intrinsics flags.
-option(ENABLE_MMX "Enables MMX optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSE "Enables SSE optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSE2 "Enables SSE2 optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSE3 "Enables SSE3 optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSSE3 "Enables SSSE3 optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSE4_1 "Enables SSE4_1 optimizations on x86/x86_64 targets." ON)
-option(ENABLE_SSE4_2 "Enables SSE4_2 optimizations on x86/x86_64 targets." ON)
-option(ENABLE_AVX "Enables AVX optimizations on x86/x86_64 targets." ON)
-option(ENABLE_AVX2 "Enables AVX2 optimizations on x86/x86_64 targets." ON)
-
-# $BUILD_SHARED_LIBS is a CMake built-in-- it's listed here for visibility.
-option(BUILD_SHARED_LIBS "CMake should generate a shared library build." OFF)
-
 project(AOM C CXX)
 
 set(AOM_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(AOM_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-set(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include"
-    CACHE PATH "Installation path of includes")
-set(LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib"
-    CACHE PATH "Installation path of libraries")
 
 if("${AOM_ROOT}" STREQUAL "${AOM_CONFIG_DIR}")
   message(FATAL_ERROR
@@ -78,21 +38,22 @@ include("${AOM_ROOT}/aom_ports/aom_ports.cmake")
 include("${AOM_ROOT}/aom_scale/aom_scale.cmake")
 include("${AOM_ROOT}/aom_util/aom_util.cmake")
 include("${AOM_ROOT}/av1/av1.cmake")
-include("${AOM_ROOT}/test/test.cmake")
+include("${AOM_ROOT}/build/cmake/aom_install.cmake")
 include("${AOM_ROOT}/build/cmake/sanitizers.cmake")
 include("${AOM_ROOT}/build/cmake/util.cmake")
+include("${AOM_ROOT}/test/test.cmake")
 
 list(APPEND AOM_RTCD_SOURCES
-            "${AOM_CONFIG_DIR}/aom_dsp_rtcd.h"
-            "${AOM_CONFIG_DIR}/aom_scale_rtcd.h"
-            "${AOM_CONFIG_DIR}/av1_rtcd.h"
+            "${AOM_CONFIG_DIR}/config/aom_dsp_rtcd.h"
+            "${AOM_CONFIG_DIR}/config/aom_scale_rtcd.h"
+            "${AOM_CONFIG_DIR}/config/av1_rtcd.h"
             "${AOM_ROOT}/aom_dsp/aom_dsp_rtcd_defs.pl"
             "${AOM_ROOT}/aom_dsp/aom_dsp_rtcd.c"
             "${AOM_ROOT}/aom_scale/aom_scale_rtcd.pl"
             "${AOM_ROOT}/aom_scale/aom_scale_rtcd.c"
             "${AOM_ROOT}/av1/common/av1_rtcd_defs.pl"
             "${AOM_ROOT}/av1/common/av1_rtcd.c"
-            "${AOM_ROOT}/build/make/rtcd.pl")
+            "${AOM_ROOT}/build/cmake/rtcd.pl")
 
 list(APPEND AOM_LIBWEBM_SOURCES
             "${AOM_ROOT}/third_party/libwebm/common/hdr_util.cc"
@@ -140,8 +101,8 @@ list(APPEND AOM_LIBYUV_SOURCES
             "${AOM_ROOT}/third_party/libyuv/source/scale_win.cc")
 
 list(APPEND AOM_SOURCES
-            "${AOM_CONFIG_DIR}/aom_config.c"
-            "${AOM_CONFIG_DIR}/aom_config.h"
+            "${AOM_CONFIG_DIR}/config/aom_config.c"
+            "${AOM_CONFIG_DIR}/config/aom_config.h"
             "${AOM_ROOT}/aom/aom.h"
             "${AOM_ROOT}/aom/aom_codec.h"
             "${AOM_ROOT}/aom/aom_decoder.h"
@@ -158,49 +119,57 @@ list(APPEND AOM_SOURCES
             "${AOM_ROOT}/aom/src/aom_image.c"
             "${AOM_ROOT}/aom/src/aom_integer.c")
 
-list(APPEND AOM_COMMON_APP_UTIL_SOURCES "${AOM_ROOT}/args.c"
-            "${AOM_ROOT}/args.h" "${AOM_ROOT}/md5_utils.c"
-            "${AOM_ROOT}/md5_utils.h" "${AOM_ROOT}/tools_common.c"
-            "${AOM_ROOT}/tools_common.h" "${AOM_ROOT}/video_common.h"
-            "${AOM_ROOT}/y4menc.c" "${AOM_ROOT}/y4menc.h")
+list(APPEND AOM_COMMON_APP_UTIL_SOURCES
+            "${AOM_ROOT}/common/args.c"
+            "${AOM_ROOT}/common/args.h"
+            "${AOM_ROOT}/common/av1_config.c"
+            "${AOM_ROOT}/common/av1_config.h"
+            "${AOM_ROOT}/common/md5_utils.c"
+            "${AOM_ROOT}/common/md5_utils.h"
+            "${AOM_ROOT}/common/tools_common.c"
+            "${AOM_ROOT}/common/tools_common.h"
+            "${AOM_ROOT}/common/video_common.h"
+            "${AOM_ROOT}/common/rawenc.c"
+            "${AOM_ROOT}/common/rawenc.h"
+            "${AOM_ROOT}/common/y4menc.c"
+            "${AOM_ROOT}/common/y4menc.h")
 
-list(APPEND AOM_DECODER_APP_UTIL_SOURCES "${AOM_ROOT}/ivfdec.c"
-            "${AOM_ROOT}/ivfdec.h" "${AOM_ROOT}/obudec.c"
-            "${AOM_ROOT}/obudec.h" "${AOM_ROOT}/video_reader.c"
-            "${AOM_ROOT}/video_reader.h")
+list(APPEND AOM_DECODER_APP_UTIL_SOURCES "${AOM_ROOT}/common/ivfdec.c"
+            "${AOM_ROOT}/common/ivfdec.h" "${AOM_ROOT}/common/obudec.c"
+            "${AOM_ROOT}/common/obudec.h" "${AOM_ROOT}/common/video_reader.c"
+            "${AOM_ROOT}/common/video_reader.h")
 
 list(APPEND AOM_ENCODER_APP_UTIL_SOURCES
-            "${AOM_ROOT}/ivfenc.c"
-            "${AOM_ROOT}/ivfenc.h"
-            "${AOM_ROOT}/video_writer.c"
-            "${AOM_ROOT}/video_writer.h"
-            "${AOM_ROOT}/warnings.c"
-            "${AOM_ROOT}/warnings.h"
-            "${AOM_ROOT}/y4minput.c"
-            "${AOM_ROOT}/y4minput.h"
+            "${AOM_ROOT}/common/ivfenc.c"
+            "${AOM_ROOT}/common/ivfenc.h"
+            "${AOM_ROOT}/common/video_writer.c"
+            "${AOM_ROOT}/common/video_writer.h"
+            "${AOM_ROOT}/common/warnings.c"
+            "${AOM_ROOT}/common/warnings.h"
+            "${AOM_ROOT}/common/y4minput.c"
+            "${AOM_ROOT}/common/y4minput.h"
             "${AOM_ROOT}/examples/encoder_util.h"
             "${AOM_ROOT}/examples/encoder_util.c")
 
-list(APPEND AOM_ENCODER_STATS_SOURCES "${AOM_ROOT}/aomstats.c"
-            "${AOM_ROOT}/aomstats.h" "${AOM_ROOT}/rate_hist.c"
-            "${AOM_ROOT}/rate_hist.h")
+list(APPEND AOM_ENCODER_STATS_SOURCES "${AOM_ROOT}/stats/aomstats.c"
+            "${AOM_ROOT}/stats/aomstats.h" "${AOM_ROOT}/stats/rate_hist.c"
+            "${AOM_ROOT}/stats/rate_hist.h")
 
-list(APPEND AOM_PKG_CONFIG_SOURCES "${AOM_CONFIG_DIR}/aom.pc")
+list(APPEND AOM_VERSION_SOURCES "${AOM_CONFIG_DIR}/config/aom_version.h")
 
-list(APPEND AOM_VERSION_SOURCES "${AOM_CONFIG_DIR}/aom_version.h")
+list(APPEND AOM_WEBM_DECODER_SOURCES "${AOM_ROOT}/common/webmdec.cc"
+            "${AOM_ROOT}/common/webmdec.h")
 
-list(APPEND AOM_WEBM_DECODER_SOURCES "${AOM_ROOT}/webmdec.cc"
-            "${AOM_ROOT}/webmdec.h")
+list(APPEND AOM_WEBM_ENCODER_SOURCES "${AOM_ROOT}/common/webmenc.cc"
+            "${AOM_ROOT}/common/webmenc.h")
 
-list(APPEND AOM_WEBM_ENCODER_SOURCES "${AOM_ROOT}/webmenc.cc"
-            "${AOM_ROOT}/webmenc.h")
-
-include_directories(${AOM_ROOT} ${AOM_CONFIG_DIR})
+include_directories(${AOM_ROOT} ${AOM_CONFIG_DIR} ${AOM_ROOT}/apps
+                    ${AOM_ROOT}/common ${AOM_ROOT}/examples ${AOM_ROOT}/stats)
 
 # Targets
 add_library(aom_version ${AOM_VERSION_SOURCES})
 add_dummy_source_file_to_target(aom_version c)
-add_custom_command(OUTPUT "${AOM_CONFIG_DIR}/aom_version.h"
+add_custom_command(OUTPUT "${AOM_CONFIG_DIR}/config/aom_version.h"
                    COMMAND ${CMAKE_COMMAND} ARGS
                            -DAOM_CONFIG_DIR=${AOM_CONFIG_DIR}
                            -DAOM_ROOT=${AOM_ROOT}
@@ -218,38 +187,25 @@ add_custom_target(aom_version_check
                   COMMENT "Updating version info if necessary." VERBATIM)
 add_dependencies(aom_version aom_version_check)
 
-if(NOT MSVC)
-  add_library(aom_pc ${AOM_PKG_CONFIG_SOURCES})
-  add_dummy_source_file_to_target(aom_pc c)
-  add_custom_command(OUTPUT "${AOM_CONFIG_DIR}/aom.pc"
-                     COMMAND ${CMAKE_COMMAND} ARGS
-                             -DAOM_CONFIG_DIR=${AOM_CONFIG_DIR}
-                             -DAOM_ROOT=${AOM_ROOT}
-                             -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-                             -DCMAKE_PROJECT_NAME=${CMAKE_PROJECT_NAME}
-                             -DCONFIG_MULTITHREAD=${CONFIG_MULTITHREAD}
-                             -DHAVE_PTHREAD_H=${HAVE_PTHREAD_H} -P
-                             "${AOM_ROOT}/build/cmake/pkg_config.cmake"
-                     COMMENT "Writing aom.pc" VERBATIM)
-  add_dependencies(aom_pc aom_version)
-endif()
-
 # TODO(tomfinegan): Move rtcd target setup where it belongs for each rtcd
 # source.
 add_rtcd_build_step("${AOM_ROOT}/aom_dsp/aom_dsp_rtcd_defs.pl"
-                    "${AOM_CONFIG_DIR}/aom_dsp_rtcd.h"
+                    "${AOM_CONFIG_DIR}/config/aom_dsp_rtcd.h"
                     "${AOM_ROOT}/aom_dsp/aom_dsp_rtcd.c" "aom_dsp_rtcd")
 add_rtcd_build_step("${AOM_ROOT}/aom_scale/aom_scale_rtcd.pl"
-                    "${AOM_CONFIG_DIR}/aom_scale_rtcd.h"
+                    "${AOM_CONFIG_DIR}/config/aom_scale_rtcd.h"
                     "${AOM_ROOT}/aom_scale/aom_scale_rtcd.c" "aom_scale_rtcd")
 add_rtcd_build_step("${AOM_ROOT}/av1/common/av1_rtcd_defs.pl"
-                    "${AOM_CONFIG_DIR}/av1_rtcd.h"
+                    "${AOM_CONFIG_DIR}/config/av1_rtcd.h"
                     "${AOM_ROOT}/av1/common/av1_rtcd.c" "av1_rtcd")
 
 add_library(aom_rtcd OBJECT ${AOM_RTCD_SOURCES})
 add_dependencies(aom_rtcd aom_version)
 
-add_library(aom_encoder_stats OBJECT ${AOM_ENCODER_STATS_SOURCES})
+if(ENABLE_EXAMPLES)
+  add_library(aom_encoder_stats OBJECT ${AOM_ENCODER_STATS_SOURCES})
+  set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} aom_encoder_stats)
+endif()
 add_library(aom ${AOM_SOURCES} $<TARGET_OBJECTS:aom_rtcd>)
 
 if(NOT MSVC AND NOT APPLE)
@@ -257,8 +213,7 @@ if(NOT MSVC AND NOT APPLE)
 endif()
 
 # List of object and static library targets.
-set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} aom_rtcd aom_encoder_stats aom_mem
-    aom_scale aom)
+set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} aom_rtcd aom_mem aom_scale aom)
 
 # Setup dependencies.
 setup_aom_dsp_targets()
@@ -279,14 +234,14 @@ endforeach()
 # aom_common_app_util library must define this function. This is a convenience
 # to allow omission of the function from applications that might want to use
 # other pieces of the util support without defining usage_exit().
-file(WRITE "${AOM_CONFIG_DIR}/usage_exit.c" "void usage_exit(void) {}")
-file(WRITE "${AOM_CONFIG_DIR}/usage_exit.cc"
+file(WRITE "${AOM_GEN_SRC_DIR}/usage_exit.c" "void usage_exit(void) {}")
+file(WRITE "${AOM_GEN_SRC_DIR}/usage_exit.cc"
            "extern \"C\" void usage_exit(void) {}")
 
 #
 # Application and application support targets.
 #
-if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
+if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
   add_library(aom_common_app_util OBJECT ${AOM_COMMON_APP_UTIL_SOURCES})
   if(CONFIG_AV1_DECODER)
     add_library(aom_decoder_app_util OBJECT ${AOM_DECODER_APP_UTIL_SOURCES})
@@ -298,8 +253,14 @@ if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
   endif()
 endif()
 
+if((CONFIG_AV1_DECODER OR CONFIG_AV1_ENCODER) AND ENABLE_EXAMPLES)
+  add_executable(resize_util "${AOM_ROOT}/examples/resize_util.c"
+                 $<TARGET_OBJECTS:aom_common_app_util>)
+  list(APPEND AOM_APP_TARGETS resize_util)
+endif()
+
 if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
-  add_executable(aomdec "${AOM_ROOT}/aomdec.c"
+  add_executable(aomdec "${AOM_ROOT}/apps/aomdec.c"
                  $<TARGET_OBJECTS:aom_common_app_util>
                  $<TARGET_OBJECTS:aom_decoder_app_util>)
   add_executable(decode_to_md5 "${AOM_ROOT}/examples/decode_to_md5.c"
@@ -334,6 +295,8 @@ if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
       add_preproc_definition(_POSIX_SOURCE)
       append_link_flag_to_target("inspect" "-s TOTAL_MEMORY=402653184")
       append_link_flag_to_target("inspect" "-s MODULARIZE=1")
+      append_link_flag_to_target(
+        "inspect" "-s \'EXTRA_EXPORTED_RUNTIME_METHODS=[\"UTF8ToString\"]\'")
       append_link_flag_to_target("inspect"
                                  "-s EXPORT_NAME=\"\'DecoderModule\'\"")
       append_link_flag_to_target("inspect" "--memory-init-file 0")
@@ -348,7 +311,7 @@ if(CONFIG_AV1_DECODER AND ENABLE_EXAMPLES)
       # Force generation of Wasm instead of asm.js
       append_link_flag_to_target("inspect" "-s WASM=1")
       append_compiler_flag("-s WASM=1")
-    endif()
+      endif()
   endif()
 
   # Maintain a list of decoder example targets.
@@ -361,7 +324,7 @@ endif()
 
 if(CONFIG_AV1_ENCODER)
   if(ENABLE_EXAMPLES)
-    add_executable(aomenc "${AOM_ROOT}/aomenc.c"
+    add_executable(aomenc "${AOM_ROOT}/apps/aomenc.c"
                    $<TARGET_OBJECTS:aom_common_app_util>
                    $<TARGET_OBJECTS:aom_encoder_app_util>
                    $<TARGET_OBJECTS:aom_encoder_stats>)
@@ -395,7 +358,7 @@ if(CONFIG_AV1_ENCODER)
       # TODO(tomfinegan): Sort out why a simple link command with
       # aom_entropy_optimizer.c won't work on macos, but dragging in all the
       # helper machinery allows the link to succeed.
-      add_executable(aom_entropy_optimizer "${AOM_CONFIG_DIR}/usage_exit.c"
+      add_executable(aom_entropy_optimizer "${AOM_GEN_SRC_DIR}/usage_exit.c"
                      "${AOM_ROOT}/tools/aom_entropy_optimizer.c"
                      $<TARGET_OBJECTS:aom_common_app_util>
                      $<TARGET_OBJECTS:aom_encoder_app_util>)
@@ -421,8 +384,7 @@ endif()
 
 if(ENABLE_TOOLS)
   if(CONFIG_AV1_DECODER)
-    require_cxx_flag_nomsvc("-std=c++11" NO)
-    add_executable(dump_obu "${AOM_CONFIG_DIR}/usage_exit.cc"
+    add_executable(dump_obu "${AOM_GEN_SRC_DIR}/usage_exit.cc"
                    "${AOM_ROOT}/tools/dump_obu.cc"
                    "${AOM_ROOT}/tools/obu_parser.cc"
                    "${AOM_ROOT}/tools/obu_parser.h"
@@ -431,10 +393,6 @@ if(ENABLE_TOOLS)
 
     list(APPEND AOM_TOOL_TARGETS dump_obu)
     list(APPEND AOM_APP_TARGETS dump_obu)
-
-    if(NOT MSVC)
-      target_compile_options(dump_obu PUBLIC -std=c++11)
-    endif()
 
     # Maintain a separate variable listing only the examples to facilitate
     # installation of example programs into an tools sub directory of
@@ -461,6 +419,15 @@ if(ENABLE_EXAMPLES AND CONFIG_AV1_ENCODER)
 endif()
 
 if(ENABLE_EXAMPLES AND CONFIG_AV1_DECODER)
+  add_executable(lightfield_tile_list_decoder
+                 "${AOM_ROOT}/examples/lightfield_tile_list_decoder.c"
+                 $<TARGET_OBJECTS:aom_common_app_util>
+                 $<TARGET_OBJECTS:aom_decoder_app_util>)
+  list(APPEND AOM_EXAMPLE_TARGETS lightfield_tile_list_decoder)
+  list(APPEND AOM_APP_TARGETS lightfield_tile_list_decoder)
+endif()
+
+if(ENABLE_EXAMPLES AND CONFIG_AV1_DECODER)
   add_executable(lightfield_decoder "${AOM_ROOT}/examples/lightfield_decoder.c"
                  $<TARGET_OBJECTS:aom_common_app_util>
                  $<TARGET_OBJECTS:aom_decoder_app_util>)
@@ -468,11 +435,21 @@ if(ENABLE_EXAMPLES AND CONFIG_AV1_DECODER)
   list(APPEND AOM_APP_TARGETS lightfield_decoder)
 endif()
 
+if(ENABLE_EXAMPLES AND CONFIG_AV1_ENCODER AND CONFIG_AV1_DECODER)
+  add_executable(lightfield_bitstream_parsing
+                 "${AOM_ROOT}/examples/lightfield_bitstream_parsing.c"
+                 $<TARGET_OBJECTS:aom_common_app_util>
+                 $<TARGET_OBJECTS:aom_encoder_app_util>
+                 $<TARGET_OBJECTS:aom_decoder_app_util>)
+  list(APPEND AOM_EXAMPLE_TARGETS lightfield_bitstream_parsing)
+  list(APPEND AOM_APP_TARGETS lightfield_bitstream_parsing)
+endif()
+
 foreach(aom_app ${AOM_APP_TARGETS})
   target_link_libraries(${aom_app} ${AOM_LIB_LINK_TYPE} aom)
 endforeach()
 
-if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
+if(ENABLE_EXAMPLES OR ENABLE_TESTS OR ENABLE_TOOLS)
   if(CONFIG_LIBYUV)
     add_library(yuv OBJECT ${AOM_LIBYUV_SOURCES})
     if(NOT MSVC)
@@ -488,8 +465,6 @@ if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
   endif()
 
   if(CONFIG_WEBM_IO)
-    require_cxx_flag_nomsvc("-std=c++11" NO)
-
     add_library(webm OBJECT ${AOM_LIBWEBM_SOURCES})
     include_directories("${AOM_ROOT}/third_party/libwebm")
     target_compile_definitions(webm PRIVATE __STDC_CONSTANT_MACROS)
@@ -497,7 +472,6 @@ if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
 
     if(NOT MSVC)
       target_compile_options(webm PRIVATE -Wno-shadow)
-      target_compile_options(webm PUBLIC -std=c++11)
     endif()
 
     # Add to existing targets.
@@ -516,7 +490,7 @@ if(CONFIG_UNIT_TESTS OR ENABLE_EXAMPLES OR ENABLE_TOOLS)
   endif()
 endif()
 
-if(CONFIG_UNIT_TESTS)
+if(ENABLE_TESTS)
 
   # Create test_libaom target and the targets it depends on.
   setup_aom_test_targets()
@@ -524,9 +498,7 @@ endif()
 
 if(HAVE_PTHREAD_H AND CONFIG_MULTITHREAD)
   find_package(Threads)
-  foreach(app_target ${AOM_APP_TARGETS})
-    target_link_libraries(${app_target} ${AOM_LIB_LINK_TYPE} Threads::Threads)
-  endforeach()
+  target_link_libraries(aom ${AOM_LIB_LINK_TYPE} Threads::Threads)
 endif()
 
 if(XCODE)
@@ -592,41 +564,6 @@ if(ENABLE_DOCS)
     message("--- Cannot find doxygen, ENABLE_DOCS turned off.")
     set(ENABLE_DOCS OFF)
   endif()
-endif()
-
-# Aomedia install rule.
-list(APPEND AOM_INSTALL_INCS "${AOM_ROOT}/aom/aom.h"
-            "${AOM_ROOT}/aom/aom_codec.h" "${AOM_ROOT}/aom/aom_frame_buffer.h"
-            "${AOM_ROOT}/aom/aom_image.h" "${AOM_ROOT}/aom/aom_integer.h"
-            "${AOM_ROOT}/aom/aom.h")
-
-if(CONFIG_AV1_DECODER)
-  if(ENABLE_EXAMPLES)
-    list(APPEND AOM_INSTALL_BINS aomdec)
-  endif()
-
-  list(APPEND AOM_INSTALL_INCS "${AOM_ROOT}/aom/aom_decoder.h"
-              "${AOM_ROOT}/aom/aomdx.h")
-endif()
-
-if(CONFIG_AV1_ENCODER)
-  if(ENABLE_EXAMPLES)
-    list(APPEND AOM_INSTALL_BINS aomenc)
-  endif()
-
-  list(APPEND AOM_INSTALL_INCS "${AOM_ROOT}/aom/aomcx.h"
-              "${AOM_ROOT}/aom/aom_encoder.h")
-endif()
-
-set(AOM_INSTALL_LIBS aom)
-
-install(FILES ${AOM_INSTALL_INCS} DESTINATION "${INCLUDE_INSTALL_DIR}/aom")
-install(FILES "${AOM_CONFIG_DIR}/aom.pc" DESTINATION
-              "${LIB_INSTALL_DIR}/pkgconfig")
-install(TARGETS ${AOM_INSTALL_LIBS} DESTINATION "${LIB_INSTALL_DIR}")
-
-if(ENABLE_EXAMPLES)
-  install(TARGETS ${AOM_INSTALL_BINS} DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
 endif()
 
 # Aomedia dist rule.
@@ -752,3 +689,6 @@ foreach(aom_source_var ${aom_source_vars})
     file(APPEND "${libaom_srcs_gni_file}" "]\n")
   endif()
 endforeach()
+
+# Generate aom.pc and setup install rule.
+setup_aom_install_targets()

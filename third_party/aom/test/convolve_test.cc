@@ -13,8 +13,9 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/aom_filter.h"
 #include "aom_mem/aom_mem.h"
@@ -57,13 +58,9 @@ typedef ::testing::tuple<int, int, const ConvolveFunctions *> ConvolveParam;
       make_tuple(64, 32, &convolve_fn), make_tuple(32, 64, &convolve_fn), \
       make_tuple(64, 64, &convolve_fn)
 
-#if CONFIG_AV1
 #define ALL_SIZES(convolve_fn)                                          \
   make_tuple(128, 64, &convolve_fn), make_tuple(64, 128, &convolve_fn), \
       make_tuple(128, 128, &convolve_fn), ALL_SIZES_64(convolve_fn)
-#else
-#define ALL_SIZES ALL_SIZES_64
-#endif  // CONFIG_AV1
 
 // Reference 8-tap subpixel filter, slightly modified to fit into this test.
 #define AV1_FILTER_WEIGHT 128
@@ -276,6 +273,8 @@ class ConvolveTest : public ::testing::TestWithParam<ConvolveParam> {
     input_ = reinterpret_cast<uint8_t *>(
                  aom_memalign(kDataAlignment, kInputBufferSize + 1)) +
              1;
+    ref8_ = reinterpret_cast<uint8_t *>(
+        aom_memalign(kDataAlignment, kOutputStride * kMaxDimension));
     output_ = reinterpret_cast<uint8_t *>(
         aom_memalign(kDataAlignment, kOutputBufferSize));
     output_ref_ = reinterpret_cast<uint8_t *>(
@@ -283,6 +282,8 @@ class ConvolveTest : public ::testing::TestWithParam<ConvolveParam> {
     input16_ = reinterpret_cast<uint16_t *>(aom_memalign(
                    kDataAlignment, (kInputBufferSize + 1) * sizeof(uint16_t))) +
                1;
+    ref16_ = reinterpret_cast<uint16_t *>(aom_memalign(
+        kDataAlignment, kOutputStride * kMaxDimension * sizeof(uint16_t)));
     output16_ = reinterpret_cast<uint16_t *>(
         aom_memalign(kDataAlignment, (kOutputBufferSize) * sizeof(uint16_t)));
     output16_ref_ = reinterpret_cast<uint16_t *>(
@@ -294,12 +295,16 @@ class ConvolveTest : public ::testing::TestWithParam<ConvolveParam> {
   static void TearDownTestCase() {
     aom_free(input_ - 1);
     input_ = NULL;
+    aom_free(ref8_);
+    ref8_ = NULL;
     aom_free(output_);
     output_ = NULL;
     aom_free(output_ref_);
     output_ref_ = NULL;
     aom_free(input16_ - 1);
     input16_ = NULL;
+    aom_free(ref16_);
+    ref16_ = NULL;
     aom_free(output16_);
     output16_ = NULL;
     aom_free(output16_ref_);
@@ -452,18 +457,22 @@ class ConvolveTest : public ::testing::TestWithParam<ConvolveParam> {
 
   const ConvolveFunctions *UUT_;
   static uint8_t *input_;
+  static uint8_t *ref8_;
   static uint8_t *output_;
   static uint8_t *output_ref_;
   static uint16_t *input16_;
+  static uint16_t *ref16_;
   static uint16_t *output16_;
   static uint16_t *output16_ref_;
   int mask_;
 };
 
 uint8_t *ConvolveTest::input_ = NULL;
+uint8_t *ConvolveTest::ref8_ = NULL;
 uint8_t *ConvolveTest::output_ = NULL;
 uint8_t *ConvolveTest::output_ref_ = NULL;
 uint16_t *ConvolveTest::input16_ = NULL;
+uint16_t *ConvolveTest::ref16_ = NULL;
 uint16_t *ConvolveTest::output16_ = NULL;
 uint16_t *ConvolveTest::output16_ref_ = NULL;
 
@@ -489,26 +498,28 @@ const int kNumFilterBanks = SWITCHABLE_FILTERS;
 const int kNumFilters = 16;
 
 TEST(ConvolveTest, FiltersWontSaturateWhenAddedPairwise) {
-  for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
-    const InterpFilter filter = (InterpFilter)filter_bank;
-    const InterpKernel *filters =
-        (const InterpKernel *)av1_get_interp_filter_kernel(filter);
-    const InterpFilterParams filter_params =
-        av1_get_interp_filter_params_with_block_size(filter, 8);
-    if (filter_params.taps != SUBPEL_TAPS) continue;
-    for (int i = 0; i < kNumFilters; i++) {
-      const int p0 = filters[i][0] + filters[i][1];
-      const int p1 = filters[i][2] + filters[i][3];
-      const int p2 = filters[i][4] + filters[i][5];
-      const int p3 = filters[i][6] + filters[i][7];
-      EXPECT_LE(p0, 128);
-      EXPECT_LE(p1, 128);
-      EXPECT_LE(p2, 128);
-      EXPECT_LE(p3, 128);
-      EXPECT_LE(p0 + p3, 128);
-      EXPECT_LE(p0 + p3 + p1, 128);
-      EXPECT_LE(p0 + p3 + p1 + p2, 128);
-      EXPECT_EQ(p0 + p1 + p2 + p3, 128);
+  int subpel_search;
+  for (subpel_search = USE_4_TAPS; subpel_search <= USE_8_TAPS;
+       ++subpel_search) {
+    for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
+      const InterpFilter filter = (InterpFilter)filter_bank;
+      const InterpKernel *filters =
+          (const InterpKernel *)av1_get_interp_filter_kernel(filter,
+                                                             subpel_search);
+      for (int i = 0; i < kNumFilters; i++) {
+        const int p0 = filters[i][0] + filters[i][1];
+        const int p1 = filters[i][2] + filters[i][3];
+        const int p2 = filters[i][4] + filters[i][5];
+        const int p3 = filters[i][6] + filters[i][7];
+        EXPECT_LE(p0, 128);
+        EXPECT_LE(p1, 128);
+        EXPECT_LE(p2, 128);
+        EXPECT_LE(p3, 128);
+        EXPECT_LE(p0 + p3, 128);
+        EXPECT_LE(p0 + p3 + p1, 128);
+        EXPECT_LE(p0 + p3 + p1 + p2, 128);
+        EXPECT_EQ(p0 + p1 + p2 + p3, 128);
+      }
     }
   }
 }
@@ -518,53 +529,51 @@ const int16_t kInvalidFilter[8] = { 0 };
 TEST_P(ConvolveTest, MatchesReferenceSubpixelFilter) {
   uint8_t *const in = input();
   uint8_t *const out = output();
-  uint8_t ref8[kOutputStride * kMaxDimension];
-  uint16_t ref16[kOutputStride * kMaxDimension];
   uint8_t *ref;
   if (UUT_->use_highbd_ == 0) {
-    ref = ref8;
+    ref = ref8_;
   } else {
-    ref = CONVERT_TO_BYTEPTR(ref16);
+    ref = CONVERT_TO_BYTEPTR(ref16_);
   }
+  int subpel_search;
+  for (subpel_search = USE_4_TAPS; subpel_search <= USE_8_TAPS;
+       ++subpel_search) {
+    for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
+      const InterpFilter filter = (InterpFilter)filter_bank;
+      const InterpKernel *filters =
+          (const InterpKernel *)av1_get_interp_filter_kernel(filter,
+                                                             subpel_search);
+      for (int filter_x = 0; filter_x < kNumFilters; ++filter_x) {
+        for (int filter_y = 0; filter_y < kNumFilters; ++filter_y) {
+          wrapper_filter_block2d_8_c(in, kInputStride, filters[filter_x],
+                                     filters[filter_y], ref, kOutputStride,
+                                     Width(), Height());
 
-  for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
-    const InterpFilter filter = (InterpFilter)filter_bank;
-    const InterpKernel *filters =
-        (const InterpKernel *)av1_get_interp_filter_kernel(filter);
-    const InterpFilterParams filter_params =
-        av1_get_interp_filter_params_with_block_size(filter, 8);
-    if (filter_params.taps != SUBPEL_TAPS) continue;
+          if (filter_x && filter_y)
+            continue;
+          else if (filter_y)
+            ASM_REGISTER_STATE_CHECK(
+                UUT_->v8_(in, kInputStride, out, kOutputStride, kInvalidFilter,
+                          16, filters[filter_y], 16, Width(), Height()));
+          else if (filter_x)
+            ASM_REGISTER_STATE_CHECK(UUT_->h8_(
+                in, kInputStride, out, kOutputStride, filters[filter_x], 16,
+                kInvalidFilter, 16, Width(), Height()));
+          else
+            ASM_REGISTER_STATE_CHECK(UUT_->copy_(
+                in, kInputStride, out, kOutputStride, kInvalidFilter, 0,
+                kInvalidFilter, 0, Width(), Height()));
 
-    for (int filter_x = 0; filter_x < kNumFilters; ++filter_x) {
-      for (int filter_y = 0; filter_y < kNumFilters; ++filter_y) {
-        wrapper_filter_block2d_8_c(in, kInputStride, filters[filter_x],
-                                   filters[filter_y], ref, kOutputStride,
-                                   Width(), Height());
+          CheckGuardBlocks();
 
-        if (filter_x && filter_y)
-          continue;
-        else if (filter_y)
-          ASM_REGISTER_STATE_CHECK(
-              UUT_->v8_(in, kInputStride, out, kOutputStride, kInvalidFilter,
-                        16, filters[filter_y], 16, Width(), Height()));
-        else if (filter_x)
-          ASM_REGISTER_STATE_CHECK(
-              UUT_->h8_(in, kInputStride, out, kOutputStride, filters[filter_x],
-                        16, kInvalidFilter, 16, Width(), Height()));
-        else
-          ASM_REGISTER_STATE_CHECK(
-              UUT_->copy_(in, kInputStride, out, kOutputStride, kInvalidFilter,
-                          0, kInvalidFilter, 0, Width(), Height()));
-
-        CheckGuardBlocks();
-
-        for (int y = 0; y < Height(); ++y)
-          for (int x = 0; x < Width(); ++x)
-            ASSERT_EQ(lookup(ref, y * kOutputStride + x),
-                      lookup(out, y * kOutputStride + x))
-                << "mismatch at (" << x << "," << y << "), "
-                << "filters (" << filter_bank << "," << filter_x << ","
-                << filter_y << ")";
+          for (int y = 0; y < Height(); ++y)
+            for (int x = 0; x < Width(); ++x)
+              ASSERT_EQ(lookup(ref, y * kOutputStride + x),
+                        lookup(out, y * kOutputStride + x))
+                  << "mismatch at (" << x << "," << y << "), "
+                  << "filters (" << filter_bank << "," << filter_x << ","
+                  << filter_y << ")";
+        }
       }
     }
   }
@@ -573,13 +582,11 @@ TEST_P(ConvolveTest, MatchesReferenceSubpixelFilter) {
 TEST_P(ConvolveTest, FilterExtremes) {
   uint8_t *const in = input();
   uint8_t *const out = output();
-  uint8_t ref8[kOutputStride * kMaxDimension];
-  uint16_t ref16[kOutputStride * kMaxDimension];
   uint8_t *ref;
   if (UUT_->use_highbd_ == 0) {
-    ref = ref8;
+    ref = ref8_;
   } else {
-    ref = CONVERT_TO_BYTEPTR(ref16);
+    ref = CONVERT_TO_BYTEPTR(ref16_);
   }
 
   // Populate ref and out with some random data
@@ -612,41 +619,43 @@ TEST_P(ConvolveTest, FilterExtremes) {
           seed_val++;
       }
       if (axis) seed_val += 8;
+      int subpel_search;
+      for (subpel_search = USE_4_TAPS; subpel_search <= USE_8_TAPS;
+           ++subpel_search) {
+        for (int filter_bank = 0; filter_bank < kNumFilterBanks;
+             ++filter_bank) {
+          const InterpFilter filter = (InterpFilter)filter_bank;
+          const InterpKernel *filters =
+              (const InterpKernel *)av1_get_interp_filter_kernel(filter,
+                                                                 subpel_search);
+          for (int filter_x = 0; filter_x < kNumFilters; ++filter_x) {
+            for (int filter_y = 0; filter_y < kNumFilters; ++filter_y) {
+              wrapper_filter_block2d_8_c(in, kInputStride, filters[filter_x],
+                                         filters[filter_y], ref, kOutputStride,
+                                         Width(), Height());
+              if (filter_x && filter_y)
+                continue;
+              else if (filter_y)
+                ASM_REGISTER_STATE_CHECK(UUT_->v8_(
+                    in, kInputStride, out, kOutputStride, kInvalidFilter, 16,
+                    filters[filter_y], 16, Width(), Height()));
+              else if (filter_x)
+                ASM_REGISTER_STATE_CHECK(UUT_->h8_(
+                    in, kInputStride, out, kOutputStride, filters[filter_x], 16,
+                    kInvalidFilter, 16, Width(), Height()));
+              else
+                ASM_REGISTER_STATE_CHECK(UUT_->copy_(
+                    in, kInputStride, out, kOutputStride, kInvalidFilter, 0,
+                    kInvalidFilter, 0, Width(), Height()));
 
-      for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
-        const InterpFilter filter = (InterpFilter)filter_bank;
-        const InterpKernel *filters =
-            (const InterpKernel *)av1_get_interp_filter_kernel(filter);
-        const InterpFilterParams filter_params =
-            av1_get_interp_filter_params_with_block_size(filter, 8);
-        if (filter_params.taps != SUBPEL_TAPS) continue;
-        for (int filter_x = 0; filter_x < kNumFilters; ++filter_x) {
-          for (int filter_y = 0; filter_y < kNumFilters; ++filter_y) {
-            wrapper_filter_block2d_8_c(in, kInputStride, filters[filter_x],
-                                       filters[filter_y], ref, kOutputStride,
-                                       Width(), Height());
-            if (filter_x && filter_y)
-              continue;
-            else if (filter_y)
-              ASM_REGISTER_STATE_CHECK(UUT_->v8_(
-                  in, kInputStride, out, kOutputStride, kInvalidFilter, 16,
-                  filters[filter_y], 16, Width(), Height()));
-            else if (filter_x)
-              ASM_REGISTER_STATE_CHECK(UUT_->h8_(
-                  in, kInputStride, out, kOutputStride, filters[filter_x], 16,
-                  kInvalidFilter, 16, Width(), Height()));
-            else
-              ASM_REGISTER_STATE_CHECK(UUT_->copy_(
-                  in, kInputStride, out, kOutputStride, kInvalidFilter, 0,
-                  kInvalidFilter, 0, Width(), Height()));
-
-            for (int y = 0; y < Height(); ++y)
-              for (int x = 0; x < Width(); ++x)
-                ASSERT_EQ(lookup(ref, y * kOutputStride + x),
-                          lookup(out, y * kOutputStride + x))
-                    << "mismatch at (" << x << "," << y << "), "
-                    << "filters (" << filter_bank << "," << filter_x << ","
-                    << filter_y << ")";
+              for (int y = 0; y < Height(); ++y)
+                for (int x = 0; x < Width(); ++x)
+                  ASSERT_EQ(lookup(ref, y * kOutputStride + x),
+                            lookup(out, y * kOutputStride + x))
+                      << "mismatch at (" << x << "," << y << "), "
+                      << "filters (" << filter_bank << "," << filter_x << ","
+                      << filter_y << ")";
+            }
           }
         }
       }
@@ -677,13 +686,11 @@ TEST_P(ConvolveTest, DISABLED_Copy_Speed) {
 TEST_P(ConvolveTest, DISABLED_Speed) {
   uint8_t *const in = input();
   uint8_t *const out = output();
-  uint8_t ref8[kOutputStride * kMaxDimension];
-  uint16_t ref16[kOutputStride * kMaxDimension];
   uint8_t *ref;
   if (UUT_->use_highbd_ == 0) {
-    ref = ref8;
+    ref = ref8_;
   } else {
-    ref = CONVERT_TO_BYTEPTR(ref16);
+    ref = CONVERT_TO_BYTEPTR(ref16_);
   }
 
   // Populate ref and out with some random data
@@ -703,7 +710,7 @@ TEST_P(ConvolveTest, DISABLED_Speed) {
 
   const InterpFilter filter = (InterpFilter)1;
   const InterpKernel *filters =
-      (const InterpKernel *)av1_get_interp_filter_kernel(filter);
+      (const InterpKernel *)av1_get_interp_filter_kernel(filter, USE_8_TAPS);
   wrapper_filter_average_block2d_8_c(in, kInputStride, filters[1], filters[1],
                                      out, kOutputStride, Width(), Height());
 
@@ -715,11 +722,8 @@ TEST_P(ConvolveTest, DISABLED_Speed) {
     for (int filter_bank = 0; filter_bank < kNumFilterBanks; ++filter_bank) {
       const InterpFilter filter = (InterpFilter)filter_bank;
       const InterpKernel *filters =
-          (const InterpKernel *)av1_get_interp_filter_kernel(filter);
-      const InterpFilterParams filter_params =
-          av1_get_interp_filter_params_with_block_size(filter, 8);
-      if (filter_params.taps != SUBPEL_TAPS) continue;
-
+          (const InterpKernel *)av1_get_interp_filter_kernel(filter,
+                                                             USE_8_TAPS);
       for (int filter_x = 0; filter_x < kNumFilters; ++filter_x) {
         for (int filter_y = 0; filter_y < kNumFilters; ++filter_y) {
           if (filter_x && filter_y) continue;
@@ -808,18 +812,22 @@ const ConvolveParam kArrayConvolve_c[] = {
 INSTANTIATE_TEST_CASE_P(C, ConvolveTest, ::testing::ValuesIn(kArrayConvolve_c));
 
 #if HAVE_SSE2 && ARCH_X86_64
-const ConvolveFunctions convolve8_sse2(wrap_convolve_copy_sse2_8,
-                                       wrap_convolve8_horiz_sse2_8,
-                                       wrap_convolve8_vert_sse2_8, 8);
-const ConvolveFunctions convolve10_sse2(wrap_convolve_copy_sse2_10,
-                                        wrap_convolve8_horiz_sse2_10,
-                                        wrap_convolve8_vert_sse2_10, 10);
-const ConvolveFunctions convolve12_sse2(wrap_convolve_copy_sse2_12,
-                                        wrap_convolve8_horiz_sse2_12,
-                                        wrap_convolve8_vert_sse2_12, 12);
+const ConvolveFunctions convolve8_sse2(aom_convolve_copy_c,
+                                       aom_convolve8_horiz_sse2,
+                                       aom_convolve8_vert_sse2, 0);
+const ConvolveFunctions wrap_convolve8_sse2(wrap_convolve_copy_sse2_8,
+                                            wrap_convolve8_horiz_sse2_8,
+                                            wrap_convolve8_vert_sse2_8, 8);
+const ConvolveFunctions wrap_convolve10_sse2(wrap_convolve_copy_sse2_10,
+                                             wrap_convolve8_horiz_sse2_10,
+                                             wrap_convolve8_vert_sse2_10, 10);
+const ConvolveFunctions wrap_convolve12_sse2(wrap_convolve_copy_sse2_12,
+                                             wrap_convolve8_horiz_sse2_12,
+                                             wrap_convolve8_vert_sse2_12, 12);
 const ConvolveParam kArrayConvolve_sse2[] = { ALL_SIZES(convolve8_sse2),
-                                              ALL_SIZES(convolve10_sse2),
-                                              ALL_SIZES(convolve12_sse2) };
+                                              ALL_SIZES(wrap_convolve8_sse2),
+                                              ALL_SIZES(wrap_convolve10_sse2),
+                                              ALL_SIZES(wrap_convolve12_sse2) };
 INSTANTIATE_TEST_CASE_P(SSE2, ConvolveTest,
                         ::testing::ValuesIn(kArrayConvolve_sse2));
 #endif
@@ -835,58 +843,25 @@ INSTANTIATE_TEST_CASE_P(SSSE3, ConvolveTest,
 #endif
 
 #if HAVE_AVX2
-const ConvolveFunctions convolve8_avx2(wrap_convolve_copy_avx2_8,
-                                       wrap_convolve8_horiz_avx2_8,
-                                       wrap_convolve8_vert_avx2_8, 8);
-const ConvolveFunctions convolve10_avx2(wrap_convolve_copy_avx2_10,
-                                        wrap_convolve8_horiz_avx2_10,
-                                        wrap_convolve8_vert_avx2_10, 10);
-const ConvolveFunctions convolve12_avx2(wrap_convolve_copy_avx2_12,
-                                        wrap_convolve8_horiz_avx2_12,
-                                        wrap_convolve8_vert_avx2_12, 12);
-const ConvolveParam kArrayConvolve8_avx2[] = { ALL_SIZES_64(convolve8_avx2),
-                                               ALL_SIZES_64(convolve10_avx2),
-                                               ALL_SIZES_64(convolve12_avx2) };
+const ConvolveFunctions convolve8_avx2(aom_convolve_copy_c,
+                                       aom_convolve8_horiz_avx2,
+                                       aom_convolve8_vert_avx2, 0);
+
+const ConvolveFunctions wrap_convolve8_avx2(wrap_convolve_copy_avx2_8,
+                                            wrap_convolve8_horiz_avx2_8,
+                                            wrap_convolve8_vert_avx2_8, 8);
+const ConvolveFunctions wrap_convolve10_avx2(wrap_convolve_copy_avx2_10,
+                                             wrap_convolve8_horiz_avx2_10,
+                                             wrap_convolve8_vert_avx2_10, 10);
+const ConvolveFunctions wrap_convolve12_avx2(wrap_convolve_copy_avx2_12,
+                                             wrap_convolve8_horiz_avx2_12,
+                                             wrap_convolve8_vert_avx2_12, 12);
+const ConvolveParam kArray_Convolve8_avx2[] = {
+  ALL_SIZES_64(wrap_convolve8_avx2), ALL_SIZES_64(wrap_convolve10_avx2),
+  ALL_SIZES_64(wrap_convolve12_avx2), ALL_SIZES(convolve8_avx2)
+};
 INSTANTIATE_TEST_CASE_P(AVX2, ConvolveTest,
-                        ::testing::ValuesIn(kArrayConvolve8_avx2));
+                        ::testing::ValuesIn(kArray_Convolve8_avx2));
 #endif  // HAVE_AVX2
 
-// TODO(any): Make NEON versions support 128x128 128x64 64x128 block sizes
-#if HAVE_NEON && !(CONFIG_AV1)
-#if HAVE_NEON_ASM
-const ConvolveFunctions convolve8_neon(aom_convolve_copy_neon,
-                                       aom_convolve8_horiz_neon,
-                                       aom_convolve8_vert_neon, 0);
-#else   // HAVE_NEON
-const ConvolveFunctions convolve8_neon(aom_convolve_copy_neon,
-                                       aom_convolve8_horiz_neon,
-                                       aom_convolve8_vert_neon, 0);
-#endif  // HAVE_NEON_ASM
-
-const ConvolveParam kArrayConvolve8_neon[] = { ALL_SIZES_64(convolve8_neon) };
-INSTANTIATE_TEST_CASE_P(NEON, ConvolveTest,
-                        ::testing::ValuesIn(kArrayConvolve8_neon));
-#endif  // HAVE_NEON && !(CONFIG_AV1)
-
-// TODO(any): Make DSPR2 versions support 128x128 128x64 64x128 block sizes
-#if HAVE_DSPR2 && !(CONFIG_AV1)
-const ConvolveFunctions convolve8_dspr2(aom_convolve_copy_dspr2,
-                                        aom_convolve8_horiz_dspr2,
-                                        aom_convolve8_vert_dspr2, 0);
-
-const ConvolveParam kArrayConvolve8_dspr2[] = { ALL_SIZES_64(convolve8_dspr2) };
-INSTANTIATE_TEST_CASE_P(DSPR2, ConvolveTest,
-                        ::testing::ValuesIn(kArrayConvolve8_dspr2));
-#endif  // HAVE_DSPR2 && !(CONFIG_AV1)
-
-// TODO(any): Make MSA versions support 128x128 128x64 64x128 block sizes
-#if HAVE_MSA && !(CONFIG_AV1)
-const ConvolveFunctions convolve8_msa(aom_convolve_copy_msa,
-                                      aom_convolve8_horiz_msa,
-                                      aom_convolve8_vert_msa, 0);
-
-const ConvolveParam kArrayConvolve8_msa[] = { ALL_SIZES_64(convolve8_msa) };
-INSTANTIATE_TEST_CASE_P(MSA, ConvolveTest,
-                        ::testing::ValuesIn(kArrayConvolve8_msa));
-#endif  // HAVE_MSA && !(CONFIG_AV1)
 }  // namespace

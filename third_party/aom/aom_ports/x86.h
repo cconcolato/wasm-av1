@@ -9,16 +9,16 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_PORTS_X86_H_
-#define AOM_PORTS_X86_H_
+#ifndef AOM_AOM_PORTS_X86_H_
+#define AOM_AOM_PORTS_X86_H_
 #include <stdlib.h>
 
 #if defined(_MSC_VER)
 #include <intrin.h> /* For __cpuidex, __rdtsc */
 #endif
 
-#include "aom_config.h"
 #include "aom/aom_integer.h"
+#include "config/aom_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -322,4 +322,4 @@ extern void aom_reset_mmx_state(void);
 }  // extern "C"
 #endif
 
-#endif  // AOM_PORTS_X86_H_
+#endif  // AOM_AOM_PORTS_X86_H_

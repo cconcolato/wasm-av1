@@ -11,15 +11,14 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
 #include "test/util.h"
-#if CONFIG_AV1
 #include "av1/common/blockd.h"
-#endif
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/mem.h"
 

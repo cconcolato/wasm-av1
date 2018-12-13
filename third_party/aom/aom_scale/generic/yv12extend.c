@@ -10,8 +10,10 @@
  */
 
 #include <assert.h>
-#include "./aom_config.h"
-#include "./aom_scale_rtcd.h"
+
+#include "config/aom_config.h"
+#include "config/aom_scale_rtcd.h"
+
 #include "aom/aom_integer.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/mem.h"
@@ -129,7 +131,6 @@ void aom_yv12_extend_frame_borders_c(YV12_BUFFER_CONFIG *ybf,
   }
 }
 
-#if CONFIG_AV1
 static void extend_frame(YV12_BUFFER_CONFIG *const ybf, int ext_size,
                          const int num_planes) {
   const int ss_x = ybf->uv_width < ybf->y_width;
@@ -196,7 +197,6 @@ void aom_extend_frame_borders_y_c(YV12_BUFFER_CONFIG *ybf) {
                ext_size + ybf->y_height - ybf->y_crop_height,
                ext_size + ybf->y_width - ybf->y_crop_width);
 }
-#endif  // CONFIG_AV1
 
 static void memcpy_short_addr(uint8_t *dst8, const uint8_t *src8, int num) {
   uint16_t *dst = CONVERT_TO_SHORTPTR(dst8);
@@ -319,4 +319,118 @@ void aom_yv12_copy_v_c(const YV12_BUFFER_CONFIG *src_bc,
     src += src_bc->uv_stride;
     dst += dst_bc->uv_stride;
   }
+}
+
+void aom_yv12_partial_copy_y_c(const YV12_BUFFER_CONFIG *src_ybc, int hstart1,
+                               int hend1, int vstart1, int vend1,
+                               YV12_BUFFER_CONFIG *dst_ybc, int hstart2,
+                               int vstart2) {
+  int row;
+  const uint8_t *src = src_ybc->y_buffer;
+  uint8_t *dst = dst_ybc->y_buffer;
+
+  if (src_ybc->flags & YV12_FLAG_HIGHBITDEPTH) {
+    const uint16_t *src16 =
+        CONVERT_TO_SHORTPTR(src + vstart1 * src_ybc->y_stride + hstart1);
+    uint16_t *dst16 =
+        CONVERT_TO_SHORTPTR(dst + vstart2 * dst_ybc->y_stride + hstart2);
+
+    for (row = vstart1; row < vend1; ++row) {
+      memcpy(dst16, src16, (hend1 - hstart1) * sizeof(uint16_t));
+      src16 += src_ybc->y_stride;
+      dst16 += dst_ybc->y_stride;
+    }
+    return;
+  }
+  src = (src + vstart1 * src_ybc->y_stride + hstart1);
+  dst = (dst + vstart2 * dst_ybc->y_stride + hstart2);
+
+  for (row = vstart1; row < vend1; ++row) {
+    memcpy(dst, src, (hend1 - hstart1));
+    src += src_ybc->y_stride;
+    dst += dst_ybc->y_stride;
+  }
+}
+
+void aom_yv12_partial_coloc_copy_y_c(const YV12_BUFFER_CONFIG *src_ybc,
+                                     YV12_BUFFER_CONFIG *dst_ybc, int hstart,
+                                     int hend, int vstart, int vend) {
+  aom_yv12_partial_copy_y_c(src_ybc, hstart, hend, vstart, vend, dst_ybc,
+                            hstart, vstart);
+}
+
+void aom_yv12_partial_copy_u_c(const YV12_BUFFER_CONFIG *src_bc, int hstart1,
+                               int hend1, int vstart1, int vend1,
+                               YV12_BUFFER_CONFIG *dst_bc, int hstart2,
+                               int vstart2) {
+  int row;
+  const uint8_t *src = src_bc->u_buffer;
+  uint8_t *dst = dst_bc->u_buffer;
+
+  if (src_bc->flags & YV12_FLAG_HIGHBITDEPTH) {
+    const uint16_t *src16 =
+        CONVERT_TO_SHORTPTR(src + vstart1 * src_bc->uv_stride + hstart1);
+    uint16_t *dst16 =
+        CONVERT_TO_SHORTPTR(dst + vstart2 * dst_bc->uv_stride + hstart2);
+    for (row = vstart1; row < vend1; ++row) {
+      memcpy(dst16, src16, (hend1 - hstart1) * sizeof(uint16_t));
+      src16 += src_bc->uv_stride;
+      dst16 += dst_bc->uv_stride;
+    }
+    return;
+  }
+
+  src = (src + vstart1 * src_bc->uv_stride + hstart1);
+  dst = (dst + vstart2 * dst_bc->uv_stride + hstart2);
+
+  for (row = vstart1; row < vend1; ++row) {
+    memcpy(dst, src, (hend1 - hstart1));
+    src += src_bc->uv_stride;
+    dst += dst_bc->uv_stride;
+  }
+}
+
+void aom_yv12_partial_coloc_copy_u_c(const YV12_BUFFER_CONFIG *src_bc,
+                                     YV12_BUFFER_CONFIG *dst_bc, int hstart,
+                                     int hend, int vstart, int vend) {
+  aom_yv12_partial_copy_u_c(src_bc, hstart, hend, vstart, vend, dst_bc, hstart,
+                            vstart);
+}
+
+void aom_yv12_partial_copy_v_c(const YV12_BUFFER_CONFIG *src_bc, int hstart1,
+                               int hend1, int vstart1, int vend1,
+                               YV12_BUFFER_CONFIG *dst_bc, int hstart2,
+                               int vstart2) {
+  int row;
+  const uint8_t *src = src_bc->v_buffer;
+  uint8_t *dst = dst_bc->v_buffer;
+
+  if (src_bc->flags & YV12_FLAG_HIGHBITDEPTH) {
+    const uint16_t *src16 =
+        CONVERT_TO_SHORTPTR(src + vstart1 * src_bc->uv_stride + hstart1);
+    uint16_t *dst16 =
+        CONVERT_TO_SHORTPTR(dst + vstart2 * dst_bc->uv_stride + hstart2);
+    for (row = vstart1; row < vend1; ++row) {
+      memcpy(dst16, src16, (hend1 - hstart1) * sizeof(uint16_t));
+      src16 += src_bc->uv_stride;
+      dst16 += dst_bc->uv_stride;
+    }
+    return;
+  }
+
+  src = (src + vstart1 * src_bc->uv_stride + hstart1);
+  dst = (dst + vstart2 * dst_bc->uv_stride + hstart2);
+
+  for (row = vstart1; row < vend1; ++row) {
+    memcpy(dst, src, (hend1 - hstart1));
+    src += src_bc->uv_stride;
+    dst += dst_bc->uv_stride;
+  }
+}
+
+void aom_yv12_partial_coloc_copy_v_c(const YV12_BUFFER_CONFIG *src_bc,
+                                     YV12_BUFFER_CONFIG *dst_bc, int hstart,
+                                     int hend, int vstart, int vend) {
+  aom_yv12_partial_copy_v_c(src_bc, hstart, hend, vstart, vend, dst_bc, hstart,
+                            vstart);
 }

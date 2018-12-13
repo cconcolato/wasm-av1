@@ -40,6 +40,9 @@ endfunction()
 # libraries do not have this limitation.
 function(add_intrinsics_object_library flag opt_name target_to_update sources
          dependent_target)
+  if("${${sources}}" STREQUAL "")
+    return()
+  endif()
   set(target_name ${target_to_update}_${opt_name}_intrinsics)
   add_library(${target_name} OBJECT ${${sources}})
 
@@ -113,6 +116,9 @@ endfunction()
 # ensure that all cmake generators can determine the linker language, and that
 # build tools don't complain that an object exposes no symbols.
 function(add_asm_library lib_name asm_sources dependent_target)
+  if("${${asm_sources}}" STREQUAL "")
+    return()
+  endif()
   set(asm_lib_obj_dir "${AOM_CONFIG_DIR}/asm_objects/${lib_name}")
   if(NOT EXISTS "${asm_lib_obj_dir}")
     file(MAKE_DIRECTORY "${asm_lib_obj_dir}")
@@ -146,59 +152,6 @@ function(add_asm_library lib_name asm_sources dependent_target)
   # Add the new lib target to the global list of aom library targets.
   list(APPEND AOM_LIB_TARGETS ${lib_name})
   set(AOM_LIB_TARGETS ${AOM_LIB_TARGETS} PARENT_SCOPE)
-endfunction()
-
-# Converts asm sources in $asm_sources using $AOM_ADS2GAS and calls
-# add_asm_library() to create a library from the converted sources. At
-# generation time the converted sources are created, and a custom rule is added
-# to ensure the sources are reconverted when the original asm source is updated.
-# See add_asm_library() for more information.
-function(add_gas_asm_library lib_name asm_sources dependent_target)
-  set(asm_converted_source_dir "${AOM_CONFIG_DIR}/asm_gas/${lib_name}")
-  if(NOT EXISTS "${asm_converted_source_dir}")
-    file(MAKE_DIRECTORY "${asm_converted_source_dir}")
-  endif()
-
-  # Create the converted version of each assembly source at generation time.
-  unset(gas_target_sources)
-  foreach(neon_asm_source ${${asm_sources}})
-    get_filename_component(output_asm_source "${neon_asm_source}" NAME)
-    set(output_asm_source "${asm_converted_source_dir}/${output_asm_source}")
-    set(output_asm_source "${output_asm_source}.${AOM_GAS_EXT}")
-    execute_process(COMMAND "${PERL_EXECUTABLE}" "${AOM_ADS2GAS}"
-                            ${AOM_ADS2GAS_OPTS}
-                    INPUT_FILE "${neon_asm_source}"
-                    OUTPUT_FILE "${output_asm_source}")
-    list(APPEND gas_target_sources "${output_asm_source}")
-  endforeach()
-
-  add_asm_library("${lib_name}" "gas_target_sources" "${dependent_target}")
-
-  # For each of the converted sources, create a custom rule that will regenerate
-  # the converted source when its input is touched.
-  list(LENGTH gas_target_sources num_asm_files)
-  math(EXPR num_asm_files "${num_asm_files} - 1")
-  foreach(NUM RANGE ${num_asm_files})
-    list(GET ${asm_sources} ${NUM} neon_asm_source)
-    list(GET gas_target_sources ${NUM} gas_asm_source)
-
-    # Grab only the filename for the custom command output to keep build output
-    # reasonably sane.
-    get_filename_component(neon_name "${neon_asm_source}" NAME)
-    get_filename_component(gas_name "${gas_asm_source}" NAME)
-
-    add_custom_command(OUTPUT "${gas_asm_source}"
-                       COMMAND ${PERL_EXECUTABLE} ARGS "${AOM_ADS2GAS}"
-                               ${AOM_ADS2GAS_OPTS} < "${neon_asm_source}" >
-                               "${gas_asm_source}"
-                       DEPENDS "${neon_asm_source}"
-                       COMMENT "ads2gas conversion ${neon_name} -> ${gas_name}"
-                       WORKING_DIRECTORY "${AOM_CONFIG_DIR}" VERBATIM)
-  endforeach()
-
-  # Update the sources list passed in to include the converted asm source files.
-  list(APPEND asm_sources ${gas_target_sources})
-  set(${asm_sources} ${${asm_sources}} PARENT_SCOPE)
 endfunction()
 
 # Terminates generation if nasm found in PATH does not meet requirements.
@@ -240,20 +193,20 @@ function(test_nasm)
 endfunction()
 
 # Adds build command for generation of rtcd C source files using
-# build/make/rtcd.pl. $config is the input perl file, $output is the output C
+# build/cmake/rtcd.pl. $config is the input perl file, $output is the output C
 # include file, $source is the C source file, and $symbol is used for the symbol
 # argument passed to rtcd.pl.
 function(add_rtcd_build_step config output source symbol)
-  add_custom_command(
-    OUTPUT ${output}
-    COMMAND ${PERL_EXECUTABLE} ARGS "${AOM_ROOT}/build/make/rtcd.pl"
-            --arch=${AOM_TARGET_CPU}
-            --sym=${symbol} ${AOM_RTCD_FLAGS}
-            --config=${AOM_CONFIG_DIR}/${AOM_TARGET_CPU}_rtcd_config.rtcd
-            ${config} > ${output}
-    DEPENDS ${config}
-    COMMENT "Generating ${output}"
-    WORKING_DIRECTORY ${AOM_CONFIG_DIR} VERBATIM)
+  add_custom_command(OUTPUT ${output}
+                     COMMAND ${PERL_EXECUTABLE} ARGS
+                             "${AOM_ROOT}/build/cmake/rtcd.pl"
+                             --arch=${AOM_TARGET_CPU}
+                             --sym=${symbol} ${AOM_RTCD_FLAGS}
+                             --config=${AOM_CONFIG_DIR}/config/aom_config.h
+                             ${config} > ${output}
+                     DEPENDS ${config}
+                     COMMENT "Generating ${output}"
+                     WORKING_DIRECTORY ${AOM_CONFIG_DIR} VERBATIM)
   set_property(SOURCE ${source} PROPERTY OBJECT_DEPENDS ${output})
   set_property(SOURCE ${output} PROPERTY GENERATED)
 endfunction()

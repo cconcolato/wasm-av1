@@ -9,8 +9,12 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include "./av1_rtcd.h"
-#include "./cdef_block.h"
+#ifndef AOM_AV1_COMMON_CDEF_BLOCK_SIMD_H_
+#define AOM_AV1_COMMON_CDEF_BLOCK_SIMD_H_
+
+#include "config/av1_rtcd.h"
+
+#include "av1/common/cdef_block.h"
 
 /* partial A is a 16-bit vector of the form:
    [x8 x7 x6 x5 x4 x3 x2 x1] and partial B has the form:
@@ -167,39 +171,22 @@ int SIMD_FUNC(cdef_find_dir)(const uint16_t *img, int stride, int32_t *var,
         v128_sub_16(v128_shr_s16(lines[i], coeff_shift), v128_dup_16(128));
   }
 
-#if defined(__SSE4_1__)
   /* Compute "mostly vertical" directions. */
-  __m128i dir47 = compute_directions(lines, cost + 4);
+  v128 dir47 = compute_directions(lines, cost + 4);
 
   array_reverse_transpose_8x8(lines, lines);
 
   /* Compute "mostly horizontal" directions. */
-  __m128i dir03 = compute_directions(lines, cost);
+  v128 dir03 = compute_directions(lines, cost);
 
-  __m128i max = _mm_max_epi32(dir03, dir47);
-  max = _mm_max_epi32(max, _mm_shuffle_epi32(max, _MM_SHUFFLE(1, 0, 3, 2)));
-  max = _mm_max_epi32(max, _mm_shuffle_epi32(max, _MM_SHUFFLE(2, 3, 0, 1)));
-  best_cost = _mm_cvtsi128_si32(max);
-  __m128i t =
-      _mm_packs_epi32(_mm_cmpeq_epi32(max, dir03), _mm_cmpeq_epi32(max, dir47));
-  best_dir = _mm_movemask_epi8(_mm_packs_epi16(t, t));
+  v128 max = v128_max_s32(dir03, dir47);
+  max = v128_max_s32(max, v128_align(max, max, 8));
+  max = v128_max_s32(max, v128_align(max, max, 4));
+  best_cost = v128_low_u32(max);
+  v128 t =
+      v128_pack_s32_s16(v128_cmpeq_32(max, dir47), v128_cmpeq_32(max, dir03));
+  best_dir = v128_movemask_8(v128_pack_s16_s8(t, t));
   best_dir = get_msb(best_dir ^ (best_dir - 1));  // Count trailing zeros
-#else
-  /* Compute "mostly vertical" directions. */
-  compute_directions(lines, cost + 4);
-
-  array_reverse_transpose_8x8(lines, lines);
-
-  /* Compute "mostly horizontal" directions. */
-  compute_directions(lines, cost);
-
-  for (i = 0; i < 8; i++) {
-    if (cost[i] > best_cost) {
-      best_cost = cost[i];
-      best_dir = i;
-    }
-  }
-#endif
 
   /* Difference between the optimal variance and the variance along the
      orthogonal direction. Again, the sum(x^2) terms cancel out. */
@@ -239,7 +226,6 @@ void SIMD_FUNC(cdef_filter_block_4x4_8)(uint8_t *dst, int dstride,
                                         const uint16_t *in, int pri_strength,
                                         int sec_strength, int dir,
                                         int pri_damping, int sec_damping,
-                                        AOM_UNUSED int max_unused,
                                         int coeff_shift) {
   v128 p0, p1, p2, p3;
   v256 sum, row, tap, res;
@@ -406,7 +392,6 @@ void SIMD_FUNC(cdef_filter_block_8x8_8)(uint8_t *dst, int dstride,
                                         const uint16_t *in, int pri_strength,
                                         int sec_strength, int dir,
                                         int pri_damping, int sec_damping,
-                                        AOM_UNUSED int max_unused,
                                         int coeff_shift) {
   int i;
   v128 p0, p1, p2, p3;
@@ -554,7 +539,6 @@ void SIMD_FUNC(cdef_filter_block_4x4_16)(uint16_t *dst, int dstride,
                                          const uint16_t *in, int pri_strength,
                                          int sec_strength, int dir,
                                          int pri_damping, int sec_damping,
-                                         AOM_UNUSED int max_unused,
                                          int coeff_shift) {
   int i;
   v256 p0, p1, p2, p3, sum, row, res;
@@ -712,7 +696,6 @@ void SIMD_FUNC(cdef_filter_block_8x8_16)(uint16_t *dst, int dstride,
                                          const uint16_t *in, int pri_strength,
                                          int sec_strength, int dir,
                                          int pri_damping, int sec_damping,
-                                         AOM_UNUSED int max_unused,
                                          int coeff_shift) {
   int i;
   v256 sum, p0, p1, p2, p3, row, res;
@@ -846,56 +829,55 @@ void SIMD_FUNC(cdef_filter_block_8x8_16)(uint16_t *dst, int dstride,
 void SIMD_FUNC(cdef_filter_block)(uint8_t *dst8, uint16_t *dst16, int dstride,
                                   const uint16_t *in, int pri_strength,
                                   int sec_strength, int dir, int pri_damping,
-                                  int sec_damping, int bsize, int max,
-                                  int coeff_shift) {
+                                  int sec_damping, int bsize, int coeff_shift) {
   if (dst8) {
     if (bsize == BLOCK_8X8) {
       SIMD_FUNC(cdef_filter_block_8x8_8)
       (dst8, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     } else if (bsize == BLOCK_4X8) {
       SIMD_FUNC(cdef_filter_block_4x4_8)
       (dst8, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
       SIMD_FUNC(cdef_filter_block_4x4_8)
       (dst8 + 4 * dstride, dstride, in + 4 * CDEF_BSTRIDE, pri_strength,
-       sec_strength, dir, pri_damping, sec_damping, max, coeff_shift);
+       sec_strength, dir, pri_damping, sec_damping, coeff_shift);
     } else if (bsize == BLOCK_8X4) {
       SIMD_FUNC(cdef_filter_block_4x4_8)
       (dst8, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
       SIMD_FUNC(cdef_filter_block_4x4_8)
       (dst8 + 4, dstride, in + 4, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     } else {
       SIMD_FUNC(cdef_filter_block_4x4_8)
       (dst8, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     }
   } else {
     if (bsize == BLOCK_8X8) {
       SIMD_FUNC(cdef_filter_block_8x8_16)
       (dst16, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     } else if (bsize == BLOCK_4X8) {
       SIMD_FUNC(cdef_filter_block_4x4_16)
       (dst16, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
       SIMD_FUNC(cdef_filter_block_4x4_16)
       (dst16 + 4 * dstride, dstride, in + 4 * CDEF_BSTRIDE, pri_strength,
-       sec_strength, dir, pri_damping, sec_damping, max, coeff_shift);
+       sec_strength, dir, pri_damping, sec_damping, coeff_shift);
     } else if (bsize == BLOCK_8X4) {
       SIMD_FUNC(cdef_filter_block_4x4_16)
       (dst16, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
       SIMD_FUNC(cdef_filter_block_4x4_16)
       (dst16 + 4, dstride, in + 4, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     } else {
       assert(bsize == BLOCK_4X4);
       SIMD_FUNC(cdef_filter_block_4x4_16)
       (dst16, dstride, in, pri_strength, sec_strength, dir, pri_damping,
-       sec_damping, max, coeff_shift);
+       sec_damping, coeff_shift);
     }
   }
 }
@@ -929,3 +911,5 @@ void SIMD_FUNC(copy_rect8_16bit_to_16bit)(uint16_t *dst, int dstride,
     }
   }
 }
+
+#endif  // AOM_AV1_COMMON_CDEF_BLOCK_SIMD_H_

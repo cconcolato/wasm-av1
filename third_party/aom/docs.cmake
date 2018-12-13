@@ -20,14 +20,21 @@ set(AOM_DOXYGEN_CONFIG_TEMPLATE "libs.doxy_template")
 set(AOM_DOXYGEN_OUTPUT_DIR "${AOM_CONFIG_DIR}/dox")
 set(AOM_DOXYGEN_SECTIONS "av1")
 
-set(AOM_DOXYGEN_SOURCES "${AOM_ROOT}/aom/aom.h" "${AOM_ROOT}/aom/aom_codec.h"
-    "${AOM_ROOT}/aom/aom_frame_buffer.h" "${AOM_ROOT}/aom/aom_image.h"
-    "${AOM_ROOT}/aom/aom_integer.h" "${AOM_ROOT}/keywords.dox"
-    "${AOM_ROOT}/mainpage.dox" "${AOM_ROOT}/usage.dox")
+set(AOM_DOXYGEN_SOURCES
+    "${AOM_ROOT}/aom/aom.h"
+    "${AOM_ROOT}/aom/aom_codec.h"
+    "${AOM_ROOT}/aom/aom_decoder.h"
+    "${AOM_ROOT}/aom/aom_encoder.h"
+    "${AOM_ROOT}/aom/aom_frame_buffer.h"
+    "${AOM_ROOT}/aom/aom_image.h"
+    "${AOM_ROOT}/aom/aom_integer.h"
+    "${AOM_ROOT}/keywords.dox"
+    "${AOM_ROOT}/mainpage.dox"
+    "${AOM_ROOT}/usage.dox")
 
 if(CONFIG_AV1_DECODER)
   set(AOM_DOXYGEN_EXAMPLE_SOURCES ${AOM_DOXYGEN_EXAMPLE_SOURCES}
-      "${AOM_ROOT}/aomdec.c" "${AOM_ROOT}/examples/decode_to_md5.c"
+      "${AOM_ROOT}/apps/aomdec.c" "${AOM_ROOT}/examples/decode_to_md5.c"
       "${AOM_ROOT}/examples/decode_with_drops.c"
       "${AOM_ROOT}/examples/simple_decoder.c")
 
@@ -37,8 +44,7 @@ if(CONFIG_AV1_DECODER)
 
   set(AOM_DOXYGEN_SECTIONS ${AOM_DOXYGEN_SECTIONS} "av1_decoder decoder")
 
-  set(AOM_DOXYGEN_SOURCES ${AOM_DOXYGEN_SOURCES}
-      "${AOM_ROOT}/aom/aom_decoder.h" "${AOM_ROOT}/aom/aomdx.h"
+  set(AOM_DOXYGEN_SOURCES ${AOM_DOXYGEN_SOURCES} "${AOM_ROOT}/aom/aomdx.h"
       "${AOM_ROOT}/usage_dx.dox")
 
   if(CONFIG_ANALYZER)
@@ -60,7 +66,7 @@ endif()
 
 if(CONFIG_AV1_ENCODER)
   set(AOM_DOXYGEN_EXAMPLE_SOURCES ${AOM_DOXYGEN_EXAMPLE_SOURCES}
-      "${AOM_ROOT}/aomenc.c" "${AOM_ROOT}/examples/lossless_encoder.c"
+      "${AOM_ROOT}/apps/aomenc.c" "${AOM_ROOT}/examples/lossless_encoder.c"
       "${AOM_ROOT}/examples/set_maps.c" "${AOM_ROOT}/examples/simple_encoder.c"
       "${AOM_ROOT}/examples/twopass_encoder.c")
 
@@ -78,7 +84,7 @@ if(CONFIG_AV1_ENCODER)
   set(AOM_DOXYGEN_SECTIONS ${AOM_DOXYGEN_SECTIONS} "av1_encoder encoder")
 
   set(AOM_DOXYGEN_SOURCES ${AOM_DOXYGEN_SOURCES} "${AOM_ROOT}/aom/aomcx.h"
-      "${AOM_ROOT}/aom/aom_encoder.h" "${AOM_ROOT}/usage_cx.dox")
+      "${AOM_ROOT}/usage_cx.dox")
 endif()
 
 if(CONFIG_AV1_DECODER AND CONFIG_AV1_ENCODER)
@@ -99,10 +105,26 @@ endif()
 
 if(CONFIG_AV1_DECODER)
   set(AOM_DOXYGEN_EXAMPLE_SOURCES ${AOM_DOXYGEN_EXAMPLE_SOURCES}
+      "${AOM_ROOT}/examples/lightfield_tile_list_decoder.c")
+
+  set(AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS ${AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS}
+      "Lightfield tile list decoder example.")
+endif()
+
+if(CONFIG_AV1_DECODER)
+  set(AOM_DOXYGEN_EXAMPLE_SOURCES ${AOM_DOXYGEN_EXAMPLE_SOURCES}
       "${AOM_ROOT}/examples/lightfield_decoder.c")
 
   set(AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS ${AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS}
       "Lightfield decoder example.")
+endif()
+
+if(CONFIG_AV1_DECODER AND CONFIG_AV1_ENCODER)
+  set(AOM_DOXYGEN_EXAMPLE_SOURCES ${AOM_DOXYGEN_EXAMPLE_SOURCES}
+      "${AOM_ROOT}/examples/lightfield_bitstream_parsing.c")
+
+  set(AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS ${AOM_DOXYGEN_EXAMPLE_DESCRIPTIONS}
+      "Lightfield bitstream parsing example.")
 endif()
 
 # Iterates over list named by $list_name and appends each item to $AOM_DOXYFILE

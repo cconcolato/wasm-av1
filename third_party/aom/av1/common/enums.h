@@ -9,10 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_ENUMS_H_
-#define AV1_COMMON_ENUMS_H_
+#ifndef AOM_AV1_COMMON_ENUMS_H_
+#define AOM_AV1_COMMON_ENUMS_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom/aom_codec.h"
 #include "aom/aom_integer.h"
 
@@ -45,8 +46,8 @@ extern "C" {
 #define MAX_MIB_MASK (MAX_MIB_SIZE - 1)
 
 // Maximum number of tile rows and tile columns
-#define MAX_TILE_ROWS 1024
-#define MAX_TILE_COLS 1024
+#define MAX_TILE_ROWS 64
+#define MAX_TILE_COLS 64
 
 #define MAX_VARTX_DEPTH 2
 
@@ -62,33 +63,14 @@ extern "C" {
 #define FRAME_OFFSET_BITS 5
 #define MAX_FRAME_DISTANCE ((1 << FRAME_OFFSET_BITS) - 1)
 
-#define REF_FRAMES_LOG2 3
-#define REF_FRAMES (1 << REF_FRAMES_LOG2)
-
-// 4 scratch frames for the new frames to support a maximum of 4 cores decoding
-// in parallel, 3 for scaled references on the encoder.
-// TODO(hkuang): Add ondemand frame buffers instead of hardcoding the number
-// of framebuffers.
-// TODO(jkoleszar): These 3 extra references could probably come from the
-// normal reference pool.
-#define FRAME_BUFFERS (REF_FRAMES + 7)
-
 // 4 frame filter levels: y plane vertical, y plane horizontal,
 // u plane, and v plane
 #define FRAME_LF_COUNT 4
 #define DEFAULT_DELTA_LF_MULTI 0
-
 #define MAX_MODE_LF_DELTAS 2
 
-typedef enum COMPOUND_DIST_WEIGHT_MODE {
-  DIST,
-} COMPOUND_DIST_WEIGHT_MODE;
-
-#define COMPOUND_WEIGHT_MODE DIST
 #define DIST_PRECISION_BITS 4
 #define DIST_PRECISION (1 << DIST_PRECISION_BITS)  // 16
-
-#define FRAME_NUM_LIMIT (INT_MAX - MAX_FRAME_DISTANCE - 1)
 
 // TODO(chengchen): Temporal flag serve as experimental flag for WIP
 // bitmask construction.
@@ -238,8 +220,7 @@ typedef enum ATTRIBUTE_PACKED {
 #define TX_PAD_VER (TX_PAD_TOP + TX_PAD_BOTTOM)
 // Pad 16 extra bytes to avoid reading overflow in SIMD optimization.
 #define TX_PAD_END 16
-#define TX_PAD_2D \
-  ((MAX_TX_SIZE + TX_PAD_HOR) * (MAX_TX_SIZE + TX_PAD_VER) + TX_PAD_END)
+#define TX_PAD_2D ((32 + TX_PAD_HOR) * (32 + TX_PAD_VER) + TX_PAD_END)
 
 // Number of maxium size transform blocks in the maximum size superblock
 #define MAX_TX_BLOCKS_IN_MAX_SB_LOG2 ((MAX_SB_SIZE_LOG2 - MAX_TX_SIZE_LOG2) * 2)
@@ -259,32 +240,30 @@ typedef enum ATTRIBUTE_PACKED {
   ADST_1D,
   FLIPADST_1D,
   IDTX_1D,
-  // TODO(sarahparker) need to eventually put something here for the
-  // mrc experiment to make this work with the ext-tx pruning functions
   TX_TYPES_1D,
 } TX_TYPE_1D;
 
 typedef enum ATTRIBUTE_PACKED {
-  DCT_DCT,    // DCT  in both horizontal and vertical
-  ADST_DCT,   // ADST in vertical, DCT in horizontal
-  DCT_ADST,   // DCT  in vertical, ADST in horizontal
-  ADST_ADST,  // ADST in both directions
-  FLIPADST_DCT,
-  DCT_FLIPADST,
-  FLIPADST_FLIPADST,
-  ADST_FLIPADST,
-  FLIPADST_ADST,
-  IDTX,
-  V_DCT,
-  H_DCT,
-  V_ADST,
-  H_ADST,
-  V_FLIPADST,
-  H_FLIPADST,
+  DCT_DCT,            // DCT in both horizontal and vertical
+  ADST_DCT,           // ADST in vertical, DCT in horizontal
+  DCT_ADST,           // DCT in vertical, ADST in horizontal
+  ADST_ADST,          // ADST in both directions
+  FLIPADST_DCT,       // FLIPADST in vertical, DCT in horizontal
+  DCT_FLIPADST,       // DCT in vertical, FLIPADST in horizontal
+  FLIPADST_FLIPADST,  // FLIPADST in both directions
+  ADST_FLIPADST,      // ADST in vertical, FLIPADST in horizontal
+  FLIPADST_ADST,      // FLIPADST in vertical, ADST in horizontal
+  IDTX,               // Identity in both directions
+  V_DCT,              // DCT in vertical, identity in horizontal
+  H_DCT,              // Identity in vertical, DCT in horizontal
+  V_ADST,             // ADST in vertical, identity in horizontal
+  H_ADST,             // Identity in vertical, ADST in horizontal
+  V_FLIPADST,         // FLIPADST in vertical, identity in horizontal
+  H_FLIPADST,         // Identity in vertical, FLIPADST in horizontal
   TX_TYPES,
 } TX_TYPE;
 
-typedef enum {
+typedef enum ATTRIBUTE_PACKED {
   REG_REG,
   REG_SMOOTH,
   REG_SHARP,
@@ -448,6 +427,8 @@ typedef enum ATTRIBUTE_PACKED {
   COMP_INTER_MODE_START = NEAREST_NEARESTMV,
   COMP_INTER_MODE_END = MB_MODE_COUNT,
   COMP_INTER_MODE_NUM = COMP_INTER_MODE_END - COMP_INTER_MODE_START,
+  INTER_MODE_START = NEARESTMV,
+  INTER_MODE_END = MB_MODE_COUNT,
   INTRA_MODES = PAETH_PRED + 1,  // PAETH_PRED has to be the last intra mode.
   INTRA_INVALID = MB_MODE_COUNT  // For uv_mode in inter blocks
 } PREDICTION_MODE;
@@ -488,7 +469,7 @@ typedef enum ATTRIBUTE_PACKED {
   INTERINTRA_MODES
 } INTERINTRA_MODE;
 
-typedef enum {
+typedef enum ATTRIBUTE_PACKED {
   COMPOUND_AVERAGE,
   COMPOUND_WEDGE,
   COMPOUND_DIFFWTD,
@@ -558,25 +539,45 @@ typedef enum ATTRIBUTE_PACKED {
 #define TXFM_PARTITION_CONTEXTS ((TX_SIZES - TX_8X8) * 6 - 3)
 typedef uint8_t TXFM_CONTEXT;
 
-#define NONE_FRAME -1
-#define INTRA_FRAME 0
-#define LAST_FRAME 1
-#define LAST2_FRAME 2
-#define LAST3_FRAME 3
-#define GOLDEN_FRAME 4
-#define BWDREF_FRAME 5
-#define ALTREF2_FRAME 6
-#define ALTREF_FRAME 7
-#define LAST_REF_FRAMES (LAST3_FRAME - LAST_FRAME + 1)
+// An enum for single reference types (and some derived values).
+enum ATTRIBUTE_PACKED {
+  NONE_FRAME = -1,
+  INTRA_FRAME,
+  LAST_FRAME,
+  LAST2_FRAME,
+  LAST3_FRAME,
+  GOLDEN_FRAME,
+  BWDREF_FRAME,
+  ALTREF2_FRAME,
+  ALTREF_FRAME,
+  REF_FRAMES,
 
-#define INTER_REFS_PER_FRAME (ALTREF_FRAME - LAST_FRAME + 1)
+  // Extra/scratch reference frame. It may be:
+  // - used to update the ALTREF2_FRAME ref (see lshift_bwd_ref_frames()), or
+  // - updated from ALTREF2_FRAME ref (see rshift_bwd_ref_frames()).
+  EXTREF_FRAME = REF_FRAMES,
 
-#define FWD_REFS (GOLDEN_FRAME - LAST_FRAME + 1)
+  // Number of inter (non-intra) reference types.
+  INTER_REFS_PER_FRAME = ALTREF_FRAME - LAST_FRAME + 1,
+
+  // Number of forward (aka past) reference types.
+  FWD_REFS = GOLDEN_FRAME - LAST_FRAME + 1,
+
+  // Number of backward (aka future) reference types.
+  BWD_REFS = ALTREF_FRAME - BWDREF_FRAME + 1,
+
+  SINGLE_REFS = FWD_REFS + BWD_REFS,
+};
+
+#define REF_FRAMES_LOG2 3
+
+// REF_FRAMES for the cm->ref_frame_map array, 1 scratch frame for the new
+// frame in cm->new_fb_idx, INTER_REFS_PER_FRAME for scaled references on the
+// encoder in the cpi->scaled_ref_idx array.
+#define FRAME_BUFFERS (REF_FRAMES + 1 + INTER_REFS_PER_FRAME)
+
 #define FWD_RF_OFFSET(ref) (ref - LAST_FRAME)
-#define BWD_REFS (ALTREF_FRAME - BWDREF_FRAME + 1)
 #define BWD_RF_OFFSET(ref) (ref - BWDREF_FRAME)
-
-#define SINGLE_REFS (FWD_REFS + BWD_REFS)
 
 typedef enum ATTRIBUTE_PACKED {
   LAST_LAST2_FRAMES,      // { LAST_FRAME, LAST2_FRAME }
@@ -603,6 +604,10 @@ typedef enum ATTRIBUTE_PACKED {
 //       possible to have a reference pair not listed for explicit signaling.
 #define MODE_CTX_REF_FRAMES (REF_FRAMES + TOTAL_COMP_REFS)
 
+// Note: It includes single and compound references. So, it can take values from
+// NONE_FRAME to (MODE_CTX_REF_FRAMES - 1). Hence, it is not defined as an enum.
+typedef int8_t MV_REFERENCE_FRAME;
+
 typedef enum ATTRIBUTE_PACKED {
   RESTORE_NONE,
   RESTORE_WIENER,
@@ -615,8 +620,12 @@ typedef enum ATTRIBUTE_PACKED {
 #define SUPERRES_SCALE_BITS 3
 #define SUPERRES_SCALE_DENOMINATOR_MIN (SCALE_NUMERATOR + 1)
 
+// In large_scale_tile coding, external references are used.
+#define MAX_EXTERNAL_REFERENCES 128
+#define MAX_TILES 512
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_ENUMS_H_
+#endif  // AOM_AV1_COMMON_ENUMS_H_

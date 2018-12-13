@@ -9,8 +9,9 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include "./aom_dsp_rtcd.h"
-#include "./av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "av1/common/enums.h"
 #include "av1/common/av1_txfm.h"
 #include "av1/common/av1_inv_txfm1d.h"
@@ -39,6 +40,7 @@ void av1_highbd_iwht4x4_16_add_c(const tran_low_t *input, uint8_t *dest8,
     c1 = e1 - c1;
     a1 -= b1;
     d1 += c1;
+
     op[0] = a1;
     op[1] = b1;
     op[2] = c1;
@@ -60,6 +62,12 @@ void av1_highbd_iwht4x4_16_add_c(const tran_low_t *input, uint8_t *dest8,
     c1 = e1 - c1;
     a1 -= b1;
     d1 += c1;
+
+    range_check_value(a1, bd + 1);
+    range_check_value(b1, bd + 1);
+    range_check_value(c1, bd + 1);
+    range_check_value(d1, bd + 1);
+
     dest[stride * 0] = highbd_clip_pixel_add(dest[stride * 0], a1, bd);
     dest[stride * 1] = highbd_clip_pixel_add(dest[stride * 1], b1, bd);
     dest[stride * 2] = highbd_clip_pixel_add(dest[stride * 2], c1, bd);
@@ -175,7 +183,6 @@ void av1_get_inv_txfm_cfg(TX_TYPE tx_type, TX_SIZE tx_size,
                           TXFM_2D_FLIP_CFG *cfg) {
   assert(cfg != NULL);
   cfg->tx_size = tx_size;
-  set_flip_cfg(tx_type, cfg);
   av1_zero(cfg->stage_range_col);
   av1_zero(cfg->stage_range_row);
   set_flip_cfg(tx_type, cfg);

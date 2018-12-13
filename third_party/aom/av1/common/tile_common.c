@@ -64,6 +64,9 @@ void av1_calculate_tile_cols(AV1_COMMON *const cm) {
     cm->tile_col_start_sb[i] = sb_cols;
     cm->min_log2_tile_rows = AOMMAX(cm->min_log2_tiles - cm->log2_tile_cols, 0);
     cm->max_tile_height_sb = sb_rows >> cm->min_log2_tile_rows;
+
+    cm->tile_width = size_sb << cm->seq_params.mib_size_log2;
+    cm->tile_width = AOMMIN(cm->tile_width, cm->mi_cols);
   } else {
     int max_tile_area_sb = (sb_rows * sb_cols);
     int widest_tile_sb = 1;
@@ -94,6 +97,9 @@ void av1_calculate_tile_rows(AV1_COMMON *const cm) {
     }
     cm->tile_rows = i;
     cm->tile_row_start_sb[i] = sb_rows;
+
+    cm->tile_height = size_sb << cm->seq_params.mib_size_log2;
+    cm->tile_height = AOMMIN(cm->tile_height, cm->mi_rows);
   } else {
     cm->log2_tile_rows = tile_log2(1, cm->tile_rows);
   }
@@ -119,6 +125,22 @@ void av1_tile_set_col(TileInfo *tile, const AV1_COMMON *cm, int col) {
   tile->mi_col_start = mi_col_start;
   tile->mi_col_end = AOMMIN(mi_col_end, cm->mi_cols);
   assert(tile->mi_col_end > tile->mi_col_start);
+}
+
+int av1_get_sb_rows_in_tile(AV1_COMMON *cm, TileInfo tile) {
+  int mi_rows_aligned_to_sb = ALIGN_POWER_OF_TWO(
+      tile.mi_row_end - tile.mi_row_start, cm->seq_params.mib_size_log2);
+  int sb_rows = mi_rows_aligned_to_sb >> cm->seq_params.mib_size_log2;
+
+  return sb_rows;
+}
+
+int av1_get_sb_cols_in_tile(AV1_COMMON *cm, TileInfo tile) {
+  int mi_cols_aligned_to_sb = ALIGN_POWER_OF_TWO(
+      tile.mi_col_end - tile.mi_col_start, cm->seq_params.mib_size_log2);
+  int sb_cols = mi_cols_aligned_to_sb >> cm->seq_params.mib_size_log2;
+
+  return sb_cols;
 }
 
 int get_tile_size(int mi_frame_size, int log2_tile_num, int *ntiles) {
@@ -158,7 +180,7 @@ AV1PixelRect av1_get_tile_rect(const TileInfo *tile_info, const AV1_COMMON *cm,
   // If upscaling is enabled, the tile limits need scaling to match the
   // upscaled frame where the restoration units live. To do this, scale up the
   // top-left and bottom-right of the tile.
-  if (!av1_superres_unscaled(cm)) {
+  if (av1_superres_scaled(cm)) {
     av1_calculate_unscaled_superres_size(&r.left, &r.top,
                                          cm->superres_scale_denominator);
     av1_calculate_unscaled_superres_size(&r.right, &r.bottom,
@@ -173,8 +195,8 @@ AV1PixelRect av1_get_tile_rect(const TileInfo *tile_info, const AV1_COMMON *cm,
   r.bottom = AOMMIN(r.bottom, frame_h);
 
   // Convert to coordinates in the appropriate plane
-  const int ss_x = is_uv && cm->subsampling_x;
-  const int ss_y = is_uv && cm->subsampling_y;
+  const int ss_x = is_uv && cm->seq_params.subsampling_x;
+  const int ss_y = is_uv && cm->seq_params.subsampling_y;
 
   r.left = ROUND_POWER_OF_TWO(r.left, ss_x);
   r.right = ROUND_POWER_OF_TWO(r.right, ss_x);

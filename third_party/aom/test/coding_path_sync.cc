@@ -13,7 +13,7 @@
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 #include "test/acm_random.h"
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
 
 #include "aom_ports/mem.h"  // ROUND_POWER_OF_TWO
 #include "aom/aomcx.h"
@@ -27,7 +27,7 @@ namespace {
 class CompressedSource {
  public:
   explicit CompressedSource(int seed) : rnd_(seed), frame_count_(0) {
-    aom_codec_iface_t *algo = &aom_codec_av1_cx_algo;
+    aom_codec_iface_t *algo = aom_codec_av1_cx();
 
     aom_codec_enc_cfg_t cfg;
     aom_codec_enc_config_default(algo, &cfg, 0);
@@ -140,7 +140,7 @@ std::vector<int16_t> Serialize(const aom_image_t *img) {
 class Decoder {
  public:
   explicit Decoder(int allowLowbitdepth) {
-    aom_codec_iface_t *algo = &aom_codec_av1_dx_algo;
+    aom_codec_iface_t *algo = aom_codec_av1_dx();
 
     aom_codec_dec_cfg_t cfg = aom_codec_dec_cfg_t();
     cfg.allow_lowbitdepth = allowLowbitdepth;

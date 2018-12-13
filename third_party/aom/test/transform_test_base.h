@@ -9,10 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef TEST_TRANSFORM_TEST_BASE_H_
-#define TEST_TRANSFORM_TEST_BASE_H_
+#ifndef AOM_TEST_TRANSFORM_TEST_BASE_H_
+#define AOM_TEST_TRANSFORM_TEST_BASE_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom_mem/aom_mem.h"
 #include "aom/aom_codec.h"
 #include "aom_dsp/txfm_common.h"
@@ -338,4 +339,4 @@ class TransformTestBase {
 
 }  // namespace libaom_test
 
-#endif  // TEST_TRANSFORM_TEST_BASE_H_
+#endif  // AOM_TEST_TRANSFORM_TEST_BASE_H_

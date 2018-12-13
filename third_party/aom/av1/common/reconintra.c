@@ -11,9 +11,10 @@
 
 #include <math.h>
 
-#include "./av1_rtcd.h"
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_mem/aom_mem.h"
 #include "aom_ports/aom_once.h"
@@ -542,8 +543,7 @@ void av1_dr_prediction_z1_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
     for (c = 0; c < bw; ++c, base += base_inc) {
       if (base < max_base_x) {
         val = above[base] * (32 - shift) + above[base + 1] * shift;
-        val = ROUND_POWER_OF_TWO(val, 5);
-        dst[c] = clip_pixel(val);
+        dst[c] = ROUND_POWER_OF_TWO(val, 5);
       } else {
         dst[c] = above[max_base_x];
       }
@@ -556,33 +556,37 @@ void av1_dr_prediction_z2_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
                             const uint8_t *above, const uint8_t *left,
                             int upsample_above, int upsample_left, int dx,
                             int dy) {
-  int r, c, x, y, shift1, shift2, val, base1, base2;
-
   assert(dx > 0);
   assert(dy > 0);
 
   const int min_base_x = -(1 << upsample_above);
+  const int min_base_y = -(1 << upsample_left);
+  (void)min_base_y;
   const int frac_bits_x = 6 - upsample_above;
   const int frac_bits_y = 6 - upsample_left;
-  const int base_inc_x = 1 << upsample_above;
-  x = -dx;
-  for (r = 0; r < bh; ++r, x -= dx, dst += stride) {
-    base1 = x >> frac_bits_x;
-    y = (r << 6) - dy;
-    for (c = 0; c < bw; ++c, base1 += base_inc_x, y -= dy) {
-      if (base1 >= min_base_x) {
-        shift1 = ((x * (1 << upsample_above)) & 0x3F) >> 1;
-        val = above[base1] * (32 - shift1) + above[base1 + 1] * shift1;
+
+  for (int r = 0; r < bh; ++r) {
+    for (int c = 0; c < bw; ++c) {
+      int val;
+      int y = r + 1;
+      int x = (c << 6) - y * dx;
+      const int base_x = x >> frac_bits_x;
+      if (base_x >= min_base_x) {
+        const int shift = ((x * (1 << upsample_above)) & 0x3F) >> 1;
+        val = above[base_x] * (32 - shift) + above[base_x + 1] * shift;
         val = ROUND_POWER_OF_TWO(val, 5);
       } else {
-        base2 = y >> frac_bits_y;
-        assert(base2 >= -(1 << upsample_left));
-        shift2 = ((y * (1 << upsample_left)) & 0x3F) >> 1;
-        val = left[base2] * (32 - shift2) + left[base2 + 1] * shift2;
+        x = c + 1;
+        y = (r << 6) - x * dy;
+        const int base_y = y >> frac_bits_y;
+        assert(base_y >= min_base_y);
+        const int shift = ((y * (1 << upsample_left)) & 0x3F) >> 1;
+        val = left[base_y] * (32 - shift) + left[base_y + 1] * shift;
         val = ROUND_POWER_OF_TWO(val, 5);
       }
-      dst[c] = clip_pixel(val);
+      dst[c] = val;
     }
+    dst += stride;
   }
 }
 
@@ -609,8 +613,7 @@ void av1_dr_prediction_z3_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
     for (r = 0; r < bh; ++r, base += base_inc) {
       if (base < max_base_y) {
         val = left[base] * (32 - shift) + left[base + 1] * shift;
-        val = ROUND_POWER_OF_TWO(val, 5);
-        dst[r * stride + c] = clip_pixel(val);
+        dst[r * stride + c] = val = ROUND_POWER_OF_TWO(val, 5);
       } else {
         for (; r < bh; ++r) dst[r * stride + c] = left[max_base_y];
         break;
@@ -619,41 +622,11 @@ void av1_dr_prediction_z3_c(uint8_t *dst, ptrdiff_t stride, int bw, int bh,
   }
 }
 
-// Get the shift (up-scaled by 256) in X w.r.t a unit change in Y.
-// If angle > 0 && angle < 90, dx = -((int)(256 / t));
-// If angle > 90 && angle < 180, dx = (int)(256 / t);
-// If angle > 180 && angle < 270, dx = 1;
-static INLINE int get_dx(int angle) {
-  if (angle > 0 && angle < 90) {
-    return dr_intra_derivative[angle];
-  } else if (angle > 90 && angle < 180) {
-    return dr_intra_derivative[180 - angle];
-  } else {
-    // In this case, we are not really going to use dx. We may return any value.
-    return 1;
-  }
-}
-
-// Get the shift (up-scaled by 256) in Y w.r.t a unit change in X.
-// If angle > 0 && angle < 90, dy = 1;
-// If angle > 90 && angle < 180, dy = (int)(256 * t);
-// If angle > 180 && angle < 270, dy = -((int)(256 * t));
-static INLINE int get_dy(int angle) {
-  if (angle > 90 && angle < 180) {
-    return dr_intra_derivative[angle - 90];
-  } else if (angle > 180 && angle < 270) {
-    return dr_intra_derivative[270 - angle];
-  } else {
-    // In this case, we are not really going to use dy. We may return any value.
-    return 1;
-  }
-}
-
 static void dr_predictor(uint8_t *dst, ptrdiff_t stride, TX_SIZE tx_size,
                          const uint8_t *above, const uint8_t *left,
                          int upsample_above, int upsample_left, int angle) {
-  const int dx = get_dx(angle);
-  const int dy = get_dy(angle);
+  const int dx = av1_get_dx(angle);
+  const int dy = av1_get_dy(angle);
   const int bw = tx_size_wide[tx_size];
   const int bh = tx_size_high[tx_size];
   assert(angle > 0 && angle < 270);
@@ -683,6 +656,7 @@ void av1_highbd_dr_prediction_z1_c(uint16_t *dst, ptrdiff_t stride, int bw,
 
   (void)left;
   (void)dy;
+  (void)bd;
   assert(dy == 1);
   assert(dx > 0);
 
@@ -705,8 +679,7 @@ void av1_highbd_dr_prediction_z1_c(uint16_t *dst, ptrdiff_t stride, int bw,
     for (c = 0; c < bw; ++c, base += base_inc) {
       if (base < max_base_x) {
         val = above[base] * (32 - shift) + above[base + 1] * shift;
-        val = ROUND_POWER_OF_TWO(val, 5);
-        dst[c] = clip_pixel_highbd(val, bd);
+        dst[c] = ROUND_POWER_OF_TWO(val, 5);
       } else {
         dst[c] = above[max_base_x];
       }
@@ -719,32 +692,36 @@ void av1_highbd_dr_prediction_z2_c(uint16_t *dst, ptrdiff_t stride, int bw,
                                    int bh, const uint16_t *above,
                                    const uint16_t *left, int upsample_above,
                                    int upsample_left, int dx, int dy, int bd) {
-  int r, c, x, y, shift, val, base;
-
+  (void)bd;
   assert(dx > 0);
   assert(dy > 0);
 
   const int min_base_x = -(1 << upsample_above);
+  const int min_base_y = -(1 << upsample_left);
+  (void)min_base_y;
   const int frac_bits_x = 6 - upsample_above;
   const int frac_bits_y = 6 - upsample_left;
-  for (r = 0; r < bh; ++r) {
-    for (c = 0; c < bw; ++c) {
-      y = r + 1;
-      x = (c << 6) - y * dx;
-      base = x >> frac_bits_x;
-      if (base >= min_base_x) {
-        shift = ((x * (1 << upsample_above)) & 0x3F) >> 1;
-        val = above[base] * (32 - shift) + above[base + 1] * shift;
+
+  for (int r = 0; r < bh; ++r) {
+    for (int c = 0; c < bw; ++c) {
+      int val;
+      int y = r + 1;
+      int x = (c << 6) - y * dx;
+      const int base_x = x >> frac_bits_x;
+      if (base_x >= min_base_x) {
+        const int shift = ((x * (1 << upsample_above)) & 0x3F) >> 1;
+        val = above[base_x] * (32 - shift) + above[base_x + 1] * shift;
         val = ROUND_POWER_OF_TWO(val, 5);
       } else {
         x = c + 1;
         y = (r << 6) - x * dy;
-        base = y >> frac_bits_y;
-        shift = ((y * (1 << upsample_left)) & 0x3F) >> 1;
-        val = left[base] * (32 - shift) + left[base + 1] * shift;
+        const int base_y = y >> frac_bits_y;
+        assert(base_y >= min_base_y);
+        const int shift = ((y * (1 << upsample_left)) & 0x3F) >> 1;
+        val = left[base_y] * (32 - shift) + left[base_y + 1] * shift;
         val = ROUND_POWER_OF_TWO(val, 5);
       }
-      dst[c] = clip_pixel_highbd(val, bd);
+      dst[c] = val;
     }
     dst += stride;
   }
@@ -759,6 +736,7 @@ void av1_highbd_dr_prediction_z3_c(uint16_t *dst, ptrdiff_t stride, int bw,
 
   (void)above;
   (void)dx;
+  (void)bd;
   assert(dx == 1);
   assert(dy > 0);
 
@@ -773,8 +751,7 @@ void av1_highbd_dr_prediction_z3_c(uint16_t *dst, ptrdiff_t stride, int bw,
     for (r = 0; r < bh; ++r, base += base_inc) {
       if (base < max_base_y) {
         val = left[base] * (32 - shift) + left[base + 1] * shift;
-        val = ROUND_POWER_OF_TWO(val, 5);
-        dst[r * stride + c] = clip_pixel_highbd(val, bd);
+        dst[r * stride + c] = ROUND_POWER_OF_TWO(val, 5);
       } else {
         for (; r < bh; ++r) dst[r * stride + c] = left[max_base_y];
         break;
@@ -787,8 +764,8 @@ static void highbd_dr_predictor(uint16_t *dst, ptrdiff_t stride,
                                 TX_SIZE tx_size, const uint16_t *above,
                                 const uint16_t *left, int upsample_above,
                                 int upsample_left, int angle, int bd) {
-  const int dx = get_dx(angle);
-  const int dy = get_dy(angle);
+  const int dx = av1_get_dx(angle);
+  const int dy = av1_get_dy(angle);
   const int bw = tx_size_wide[tx_size];
   const int bh = tx_size_high[tx_size];
   assert(angle > 0 && angle < 270);
@@ -1101,13 +1078,6 @@ static void filter_intra_edge_corner_high(uint16_t *p_above, uint16_t *p_left) {
   p_left[-1] = s;
 }
 
-static int use_intra_edge_upsample(int bs0, int bs1, int delta, int type) {
-  const int d = abs(delta);
-  const int blk_wh = bs0 + bs1;
-  if (d <= 0 || d >= 40) return 0;
-  return type ? (blk_wh <= 8) : (blk_wh <= 16);
-}
-
 void av1_upsample_intra_edge_c(uint8_t *p, int sz) {
   // interpolate half-sample positions
   assert(sz <= MAX_UPSAMPLE_SZ);
@@ -1314,13 +1284,13 @@ static void build_intra_predictors_high(
         }
       }
       upsample_above =
-          use_intra_edge_upsample(txwpx, txhpx, p_angle - 90, filt_type);
+          av1_use_intra_edge_upsample(txwpx, txhpx, p_angle - 90, filt_type);
       if (need_above && upsample_above) {
         const int n_px = txwpx + (need_right ? txhpx : 0);
         av1_upsample_intra_edge_high(above_row, n_px, xd->bd);
       }
       upsample_left =
-          use_intra_edge_upsample(txhpx, txwpx, p_angle - 180, filt_type);
+          av1_use_intra_edge_upsample(txhpx, txwpx, p_angle - 180, filt_type);
       if (need_left && upsample_left) {
         const int n_px = txhpx + (need_bottom ? txwpx : 0);
         av1_upsample_intra_edge_high(left_col, n_px, xd->bd);
@@ -1497,13 +1467,13 @@ static void build_intra_predictors(const MACROBLOCKD *xd, const uint8_t *ref,
         }
       }
       upsample_above =
-          use_intra_edge_upsample(txwpx, txhpx, p_angle - 90, filt_type);
+          av1_use_intra_edge_upsample(txwpx, txhpx, p_angle - 90, filt_type);
       if (need_above && upsample_above) {
         const int n_px = txwpx + (need_right ? txhpx : 0);
         av1_upsample_intra_edge(above_row, n_px);
       }
       upsample_left =
-          use_intra_edge_upsample(txhpx, txwpx, p_angle - 180, filt_type);
+          av1_use_intra_edge_upsample(txhpx, txwpx, p_angle - 180, filt_type);
       if (need_left && upsample_left) {
         const int n_px = txhpx + (need_bottom ? txwpx : 0);
         av1_upsample_intra_edge(left_col, n_px);
@@ -1536,7 +1506,8 @@ void av1_predict_intra_block(
 
   if (use_palette) {
     int r, c;
-    const uint8_t *const map = xd->plane[plane != 0].color_index_map;
+    const uint8_t *const map = xd->plane[plane != 0].color_index_map +
+                               xd->color_index_map_offset[plane != 0];
     const uint16_t *const palette =
         mbmi->palette_mode_info.palette_colors + plane * PALETTE_MAX_SIZE;
     if (xd->cur_buf->flags & YV12_FLAG_HIGHBITDEPTH) {
@@ -1638,7 +1609,8 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
   if (plane != AOM_PLANE_Y && mbmi->uv_mode == UV_CFL_PRED) {
 #if CONFIG_DEBUG
     assert(is_cfl_allowed(xd));
-    const BLOCK_SIZE plane_bsize = get_plane_block_size(mbmi->sb_type, pd);
+    const BLOCK_SIZE plane_bsize = get_plane_block_size(
+        mbmi->sb_type, pd->subsampling_x, pd->subsampling_y);
     (void)plane_bsize;
     assert(plane_bsize < BLOCK_SIZES_ALL);
     if (!xd->lossless[mbmi->segment_id]) {
@@ -1670,4 +1642,6 @@ void av1_predict_intra_block_facade(const AV1_COMMON *cm, MACROBLOCKD *xd,
                           dst_stride, dst, dst_stride, blk_col, blk_row, plane);
 }
 
-void av1_init_intra_predictors(void) { once(init_intra_predictors_internal); }
+void av1_init_intra_predictors(void) {
+  aom_once(init_intra_predictors_internal);
+}

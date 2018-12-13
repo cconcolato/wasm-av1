@@ -9,19 +9,18 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_DSP_PROB_H_
-#define AOM_DSP_PROB_H_
+#ifndef AOM_AOM_DSP_PROB_H_
+#define AOM_AOM_DSP_PROB_H_
 
 #include <assert.h>
 #include <stdio.h>
 
-#include "./aom_config.h"
-#include "./aom_dsp_common.h"
+#include "config/aom_config.h"
 
+#include "aom_dsp/aom_dsp_common.h"
+#include "aom_dsp/entcode.h"
 #include "aom_ports/bitops.h"
 #include "aom_ports/mem.h"
-
-#include "aom_dsp/entcode.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -669,4 +668,4 @@ static INLINE void update_cdf(aom_cdf_prob *cdf, int val, int nsymbs) {
 }  // extern "C"
 #endif
 
-#endif  // AOM_DSP_PROB_H_
+#endif  // AOM_AOM_DSP_PROB_H_

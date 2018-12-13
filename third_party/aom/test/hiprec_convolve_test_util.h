@@ -9,8 +9,10 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
-#define TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+#ifndef AOM_TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+#define AOM_TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+
+#include "config/av1_rtcd.h"
 
 #include "test/acm_random.h"
 #include "test/util.h"
@@ -18,7 +20,6 @@
 #include "test/register_state_check.h"
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./av1_rtcd.h"
 #include "aom_ports/aom_timer.h"
 #include "av1/common/convolve.h"
 #include "av1/common/mv.h"
@@ -89,4 +90,4 @@ class AV1HighbdHiprecConvolveTest
 
 }  // namespace libaom_test
 
-#endif  // TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+#endif  // AOM_TEST_HIPREC_CONVOLVE_TEST_UTIL_H_

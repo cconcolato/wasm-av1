@@ -9,14 +9,16 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
-#define TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+#ifndef AOM_TEST_AV1_CONVOLVE_2D_TEST_UTIL_H_
+#define AOM_TEST_AV1_CONVOLVE_2D_TEST_UTIL_H_
+
+#include "config/av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 #include "test/acm_random.h"
 #include "test/util.h"
-#include "./av1_rtcd.h"
-#include "./aom_dsp_rtcd.h"
+
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
 
@@ -26,8 +28,8 @@ namespace AV1Convolve2D {
 
 typedef void (*convolve_2d_func)(const uint8_t *src, int src_stride,
                                  uint8_t *dst, int dst_stride, int w, int h,
-                                 InterpFilterParams *filter_params_x,
-                                 InterpFilterParams *filter_params_y,
+                                 const InterpFilterParams *filter_params_x,
+                                 const InterpFilterParams *filter_params_y,
                                  const int subpel_x_q4, const int subpel_y_q4,
                                  ConvolveParams *conv_params);
 
@@ -60,6 +62,7 @@ class AV1JntConvolve2DTest : public ::testing::TestWithParam<Convolve2DParam> {
 
  protected:
   void RunCheckOutput(convolve_2d_func test_impl);
+  void RunSpeedTest(convolve_2d_func test_impl);
 
   libaom_test::ACMRandom rnd_;
 };
@@ -68,8 +71,8 @@ class AV1JntConvolve2DTest : public ::testing::TestWithParam<Convolve2DParam> {
 namespace AV1HighbdConvolve2D {
 typedef void (*highbd_convolve_2d_func)(
     const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w,
-    int h, InterpFilterParams *filter_params_x,
-    InterpFilterParams *filter_params_y, const int subpel_x_q4,
+    int h, const InterpFilterParams *filter_params_x,
+    const InterpFilterParams *filter_params_y, const int subpel_x_q4,
     const int subpel_y_q4, ConvolveParams *conv_params, int bd);
 
 typedef ::testing::tuple<int, highbd_convolve_2d_func, int, int, BLOCK_SIZE>
@@ -111,4 +114,4 @@ class AV1HighbdJntConvolve2DTest
 
 }  // namespace libaom_test
 
-#endif  // TEST_HIPREC_CONVOLVE_TEST_UTIL_H_
+#endif  // AOM_TEST_AV1_CONVOLVE_2D_TEST_UTIL_H_

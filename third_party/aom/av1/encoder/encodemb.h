@@ -9,11 +9,13 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_ENCODEMB_H_
-#define AV1_ENCODER_ENCODEMB_H_
+#ifndef AOM_AV1_ENCODER_ENCODEMB_H_
+#define AOM_AV1_ENCODER_ENCODEMB_H_
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "av1/common/onyxc_int.h"
+#include "av1/common/txb_common.h"
 #include "av1/encoder/block.h"
 #include "av1/encoder/tokenize.h"
 #ifdef __cplusplus
@@ -45,15 +47,26 @@ typedef enum AV1_XFORM_QUANT {
 
 void av1_encode_sb(const struct AV1_COMP *cpi, MACROBLOCK *x, BLOCK_SIZE bsize,
                    int mi_row, int mi_col, RUN_TYPE dry_run);
+
+void av1_foreach_transformed_block_in_plane(
+    const MACROBLOCKD *const xd, BLOCK_SIZE bsize, int plane,
+    foreach_transformed_block_visitor visit, void *arg);
+
+void av1_foreach_transformed_block(const MACROBLOCKD *const xd,
+                                   BLOCK_SIZE bsize, int mi_row, int mi_col,
+                                   foreach_transformed_block_visitor visit,
+                                   void *arg, const int num_planes);
+
 void av1_encode_sby_pass1(AV1_COMMON *cm, MACROBLOCK *x, BLOCK_SIZE bsize);
+
 void av1_xform_quant(const AV1_COMMON *cm, MACROBLOCK *x, int plane, int block,
                      int blk_row, int blk_col, BLOCK_SIZE plane_bsize,
-                     TX_SIZE tx_size, AV1_XFORM_QUANT xform_quant_idx);
+                     TX_SIZE tx_size, TX_TYPE tx_type,
+                     AV1_XFORM_QUANT xform_quant_idx);
 
 int av1_optimize_b(const struct AV1_COMP *cpi, MACROBLOCK *mb, int plane,
-                   int blk_row, int blk_col, int block, BLOCK_SIZE plane_bsize,
-                   TX_SIZE tx_size, const ENTROPY_CONTEXT *a,
-                   const ENTROPY_CONTEXT *l, int fast_mode, int *rate_cost);
+                   int block, TX_SIZE tx_size, TX_TYPE tx_type,
+                   const TXB_CTX *const txb_ctx, int fast_mode, int *rate_cost);
 
 void av1_subtract_txb(MACROBLOCK *x, int plane, BLOCK_SIZE plane_bsize,
                       int blk_col, int blk_row, TX_SIZE tx_size);
@@ -80,4 +93,4 @@ void av1_encode_intra_block_plane(const struct AV1_COMP *cpi, MACROBLOCK *x,
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_ENCODEMB_H_
+#endif  // AOM_AV1_ENCODER_ENCODEMB_H_

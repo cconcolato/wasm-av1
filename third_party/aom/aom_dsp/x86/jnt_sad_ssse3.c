@@ -13,12 +13,11 @@
 #include <emmintrin.h>  // SSE2
 #include <tmmintrin.h>
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
 
 #include "aom_dsp/x86/synonyms.h"
-
-#include "./av1_rtcd.h"
 
 unsigned int aom_sad4xh_sse2(const uint8_t *a, int a_stride, const uint8_t *b,
                              int b_stride, int width, int height) {
@@ -214,12 +213,9 @@ unsigned int aom_sad128xh_sse2(const uint8_t *a, int a_stride, const uint8_t *b,
   }
 
 /* clang-format off */
-#if CONFIG_AV1
 jnt_sadMxN_sse2(128, 128)
 jnt_sadMxN_sse2(128, 64)
 jnt_sadMxN_sse2(64, 128)
-#endif  // CONFIG_AV1
-
 jnt_sadMxN_sse2(64, 64)
 jnt_sadMxN_sse2(64, 32)
 jnt_sadMxN_sse2(32, 64)
@@ -233,13 +229,10 @@ jnt_sadMxN_sse2(8, 8)
 jnt_sadMxN_sse2(8, 4)
 jnt_sadMxN_sse2(4, 8)
 jnt_sadMxN_sse2(4, 4)
-
-#if CONFIG_AV1
 jnt_sadMxN_sse2(4, 16)
 jnt_sadMxN_sse2(16, 4)
 jnt_sadMxN_sse2(8, 32)
 jnt_sadMxN_sse2(32, 8)
 jnt_sadMxN_sse2(16, 64)
 jnt_sadMxN_sse2(64, 16)
-#endif
     /* clang-format on */

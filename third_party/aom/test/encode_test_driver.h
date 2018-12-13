@@ -8,15 +8,16 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
-#ifndef TEST_ENCODE_TEST_DRIVER_H_
-#define TEST_ENCODE_TEST_DRIVER_H_
+#ifndef AOM_TEST_ENCODE_TEST_DRIVER_H_
+#define AOM_TEST_ENCODE_TEST_DRIVER_H_
 
 #include <string>
 #include <vector>
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #if CONFIG_AV1_ENCODER
 #include "aom/aomcx.h"
 #endif
@@ -206,12 +207,11 @@ class EncoderTest {
     return !(::testing::Test::HasFatalFailure() || abort_);
   }
 
-  const CodecFactory *codec_;
   // Hook to determine whether to decode frame after encoding
-  virtual bool DoDecode() const { return 1; }
+  virtual bool DoDecode() const { return true; }
 
   // Hook to determine whether to decode invisible frames after encoding
-  virtual bool DoDecodeInvisible() const { return 1; }
+  virtual bool DoDecodeInvisible() const { return true; }
 
   // Hook to handle encode/decode mismatch
   virtual void MismatchHook(const aom_image_t *img1, const aom_image_t *img2);
@@ -233,6 +233,7 @@ class EncoderTest {
     return pkt;
   }
 
+  const CodecFactory *codec_;
   bool abort_;
   aom_codec_enc_cfg_t cfg_;
   unsigned int passes_;
@@ -245,4 +246,4 @@ class EncoderTest {
 
 }  // namespace libaom_test
 
-#endif  // TEST_ENCODE_TEST_DRIVER_H_
+#endif  // AOM_TEST_ENCODE_TEST_DRIVER_H_

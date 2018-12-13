@@ -15,7 +15,7 @@
 #
 SRCS=decode-av1.c
 
-AOMDIR=third_party/aom
+AOMDIR=../aom
 
 LIBDIR=third_party/embuild
 
@@ -51,7 +51,8 @@ $(TARGET): $(DEPS) blob-api.c yuv-to-rgb.c $(EMLIBAV1)
 										'_AVX_Decoder_video_finished', \
 										'_AVX_Decoder_get_frame', \
 										'_AVX_Video_Frame_get_buffer', \
-										'_AVX_YUV_to_RGB', \
+										'_AVX_YUV16_to_RGB', \
+										'_AVX_YUV8_to_RGB', \
 										'_DS_open', \
 										'_DS_close', \
 										'_DS_set_blob', \

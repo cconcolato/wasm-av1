@@ -11,8 +11,8 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
-#include "test/ivf_video_source.h"
+#include "config/aom_config.h"
+
 #include "test/util.h"
 #include "aom/aomdx.h"
 #include "aom/aom_decoder.h"
@@ -22,7 +22,7 @@ namespace {
 TEST(DecodeAPI, InvalidParams) {
   static const aom_codec_iface_t *kCodecs[] = {
 #if CONFIG_AV1_DECODER
-    &aom_codec_av1_dx_algo,
+    aom_codec_av1_dx(),
 #endif
   };
   uint8_t buf[1] = { 0 };

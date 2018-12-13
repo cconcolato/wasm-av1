@@ -12,27 +12,11 @@
 #include <assert.h>
 #include <smmintrin.h>
 
-#include "./aom_dsp_rtcd.h"
-#include "aom_dsp/aom_convolve.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "aom_dsp/aom_dsp_common.h"
 #include "aom_dsp/aom_filter.h"
 #include "av1/common/convolve.h"
-
-// Make a mask for coefficients of 10/12 tap filters. The coefficients are
-// packed "89ab89ab". If it's a 12-tap filter, we want all 1's; if it's a
-// 10-tap filter, we want "11001100" to just match the 8,9 terms.
-static __m128i make_1012_mask(int ntaps) {
-  uint32_t low = 0xffffffff;
-  uint32_t high = (ntaps == 12) ? low : 0;
-  return _mm_set_epi32(high, low, high, low);
-}
-
-// Load an SSE register from p and bitwise AND with a.
-static __m128i load_and_128i(const void *p, __m128i a) {
-  const __m128d ad = _mm_castsi128_pd(a);
-  const __m128d bd = _mm_load1_pd((const double *)p);
-  return _mm_castpd_si128(_mm_and_pd(ad, bd));
-}
 
 // A specialised version of hfilter, the horizontal filter for
 // av1_convolve_2d_scale_sse4_1. This version only supports 8 tap filters.
@@ -54,7 +38,7 @@ static void hfilter8(const uint8_t *src, int src_stride, int16_t *dst, int w,
     const int filter_idx = (x_qn & SCALE_SUBPEL_MASK) >> SCALE_EXTRA_BITS;
     assert(filter_idx < SUBPEL_SHIFTS);
     const int16_t *filter =
-        av1_get_interp_filter_subpel_kernel(*filter_params, filter_idx);
+        av1_get_interp_filter_subpel_kernel(filter_params, filter_idx);
 
     // Load the filter coefficients
     const __m128i coefflo = _mm_loadu_si128((__m128i *)filter);
@@ -113,28 +97,6 @@ static void hfilter8(const uint8_t *src, int src_stride, int16_t *dst, int w,
   }
 }
 
-// Do a 12-tap convolution with the given coefficients, loading data from src.
-static __m128i convolve_32(const int32_t *src, __m128i coeff03, __m128i coeff47,
-                           __m128i coeff8d) {
-  const __m128i data03 = _mm_loadu_si128((__m128i *)src);
-  const __m128i data47 = _mm_loadu_si128((__m128i *)(src + 4));
-  const __m128i data8d = _mm_loadu_si128((__m128i *)(src + 8));
-  const __m128i conv03 = _mm_mullo_epi32(data03, coeff03);
-  const __m128i conv47 = _mm_mullo_epi32(data47, coeff47);
-  const __m128i conv8d = _mm_mullo_epi32(data8d, coeff8d);
-  return _mm_add_epi32(_mm_add_epi32(conv03, conv47), conv8d);
-}
-
-// Do an 8-tap convolution with the given coefficients, loading data from src.
-static __m128i convolve_32_8(const int32_t *src, __m128i coeff03,
-                             __m128i coeff47) {
-  const __m128i data03 = _mm_loadu_si128((__m128i *)src);
-  const __m128i data47 = _mm_loadu_si128((__m128i *)(src + 4));
-  const __m128i conv03 = _mm_mullo_epi32(data03, coeff03);
-  const __m128i conv47 = _mm_mullo_epi32(data47, coeff47);
-  return _mm_add_epi32(conv03, conv47);
-}
-
 static __m128i convolve_16_8(const int16_t *src, __m128i coeff) {
   __m128i data = _mm_loadu_si128((__m128i *)src);
   return _mm_madd_epi16(data, coeff);
@@ -177,7 +139,7 @@ static void vfilter8(const int16_t *src, int src_stride, uint8_t *dst,
     const int filter_idx = (y_qn & SCALE_SUBPEL_MASK) >> SCALE_EXTRA_BITS;
     assert(filter_idx < SUBPEL_SHIFTS);
     const int16_t *filter =
-        av1_get_interp_filter_subpel_kernel(*filter_params, filter_idx);
+        av1_get_interp_filter_subpel_kernel(filter_params, filter_idx);
 
     const __m128i coeff0716 = _mm_loadu_si128((__m128i *)filter);
     int x;
@@ -269,8 +231,8 @@ static void vfilter8(const int16_t *src, int src_stride, uint8_t *dst,
 }
 void av1_convolve_2d_scale_sse4_1(const uint8_t *src, int src_stride,
                                   uint8_t *dst8, int dst8_stride, int w, int h,
-                                  InterpFilterParams *filter_params_x,
-                                  InterpFilterParams *filter_params_y,
+                                  const InterpFilterParams *filter_params_x,
+                                  const InterpFilterParams *filter_params_y,
                                   const int subpel_x_qn, const int x_step_qn,
                                   const int subpel_y_qn, const int y_step_qn,
                                   ConvolveParams *conv_params) {
@@ -294,15 +256,6 @@ void av1_convolve_2d_scale_sse4_1(const uint8_t *src, int src_stride,
            filter_params_y, conv_params, 8);
 }
 
-// An wrapper to generate the SHUFPD instruction with __m128i types (just
-// writing _mm_shuffle_pd at the callsites gets a bit ugly because of the
-// casts)
-static __m128i mm_shuffle0_si128(__m128i a, __m128i b) {
-  __m128d ad = _mm_castsi128_pd(a);
-  __m128d bd = _mm_castsi128_pd(b);
-  return _mm_castpd_si128(_mm_shuffle_pd(ad, bd, 0));
-}
-
 // A specialised version of hfilter, the horizontal filter for
 // av1_highbd_convolve_2d_scale_sse4_1. This version only supports 8 tap
 // filters.
@@ -324,7 +277,7 @@ static void highbd_hfilter8(const uint16_t *src, int src_stride, int16_t *dst,
     const int filter_idx = (x_qn & SCALE_SUBPEL_MASK) >> SCALE_EXTRA_BITS;
     assert(filter_idx < SUBPEL_SHIFTS);
     const int16_t *filter =
-        av1_get_interp_filter_subpel_kernel(*filter_params, filter_idx);
+        av1_get_interp_filter_subpel_kernel(filter_params, filter_idx);
 
     // Load the filter coefficients
     const __m128i coefflo = _mm_loadu_si128((__m128i *)filter);
@@ -418,7 +371,7 @@ static void highbd_vfilter8(const int16_t *src, int src_stride, uint16_t *dst,
     const int filter_idx = (y_qn & SCALE_SUBPEL_MASK) >> SCALE_EXTRA_BITS;
     assert(filter_idx < SUBPEL_SHIFTS);
     const int16_t *filter =
-        av1_get_interp_filter_subpel_kernel(*filter_params, filter_idx);
+        av1_get_interp_filter_subpel_kernel(filter_params, filter_idx);
 
     const __m128i coeff0716 = _mm_loadu_si128((__m128i *)filter);
     int x;
@@ -518,8 +471,8 @@ static void highbd_vfilter8(const int16_t *src, int src_stride, uint16_t *dst,
 
 void av1_highbd_convolve_2d_scale_sse4_1(
     const uint16_t *src, int src_stride, uint16_t *dst, int dst_stride, int w,
-    int h, InterpFilterParams *filter_params_x,
-    InterpFilterParams *filter_params_y, const int subpel_x_qn,
+    int h, const InterpFilterParams *filter_params_x,
+    const InterpFilterParams *filter_params_y, const int subpel_x_qn,
     const int x_step_qn, const int subpel_y_qn, const int y_step_qn,
     ConvolveParams *conv_params, int bd) {
   // TODO(yaowu): Move this out of stack

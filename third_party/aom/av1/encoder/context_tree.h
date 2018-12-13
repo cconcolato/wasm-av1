@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_CONTEXT_TREE_H_
-#define AV1_ENCODER_CONTEXT_TREE_H_
+#ifndef AOM_AV1_ENCODER_CONTEXT_TREE_H_
+#define AOM_AV1_ENCODER_CONTEXT_TREE_H_
 
 #include "av1/common/blockd.h"
 #include "av1/encoder/block.h"
@@ -56,6 +56,8 @@ typedef struct {
   int hybrid_pred_diff;
   int comp_pred_diff;
   int single_pred_diff;
+  // Skip certain ref frames during RD search of rectangular partitions.
+  int skip_ref_frame_mask;
 
   // TODO(jingning) Use RD_COST struct here instead. This involves a boarder
   // scope of refactoring.
@@ -65,12 +67,37 @@ typedef struct {
   int rd_mode_is_ready;  // Flag to indicate whether rd pick mode decision has
                          // been made.
 
+#if CONFIG_ONE_PASS_SVM
+  // Features for one pass svm early term
+  int seg_feat;
+#endif
+
   // motion vector cache for adaptive motion search control in partition
   // search loop
   MV pred_mv[REF_FRAMES];
   InterpFilter pred_interp_filter;
   PARTITION_TYPE partition;
+
+  // Reference and prediction mode cache for ref/mode speedup
+  // TODO(zoeliu@gmail.com): The values of ref_selected and mode_selected will
+  // be explored for further encoder speedup, to differentiate this approach for
+  // setting skip_ref_frame_mask from others. For instance, it is possible that
+  // the underlying square block(s) share the same SIMPLE_TRANSLATION motion
+  // mode as well as the mode of GLOBALMV, more ref/mode combos could be
+  // skipped.
+  MV_REFERENCE_FRAME ref_selected[2];
+  int mode_selected;
 } PICK_MODE_CONTEXT;
+
+typedef struct {
+  int valid;
+  int split;
+  int skip;
+  int64_t rdcost;
+  int sub_block_split[4];
+  int sub_block_skip[4];
+  int64_t sub_block_rdcost[4];
+} PC_TREE_STATS;
 
 typedef struct PC_TREE {
   int index;
@@ -87,6 +114,7 @@ typedef struct PC_TREE {
   PICK_MODE_CONTEXT vertical4[4];
   CB_TREE_SEARCH cb_search_range;
   struct PC_TREE *split[4];
+  PC_TREE_STATS pc_tree_stats;
 } PC_TREE;
 
 void av1_setup_pc_tree(struct AV1Common *cm, struct ThreadData *td);
@@ -98,4 +126,4 @@ void av1_copy_tree_context(PICK_MODE_CONTEXT *dst_ctx,
 }  // extern "C"
 #endif
 
-#endif /* AV1_ENCODER_CONTEXT_TREE_H_ */
+#endif  // AOM_AV1_ENCODER_CONTEXT_TREE_H_

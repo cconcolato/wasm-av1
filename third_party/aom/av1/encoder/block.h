@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_BLOCK_H_
-#define AV1_ENCODER_BLOCK_H_
+#ifndef AOM_AV1_ENCODER_BLOCK_H_
+#define AOM_AV1_ENCODER_BLOCK_H_
 
 #include "av1/common/entropymv.h"
 #include "av1/common/entropy.h"
@@ -74,7 +74,6 @@ typedef struct {
 } CB_COEFF_BUFFER;
 
 typedef struct {
-  int_mv ref_mvs[MODE_CTX_REF_FRAMES][MAX_MV_REF_CANDIDATES];
   int16_t mode_context[MODE_CTX_REF_FRAMES];
   // TODO(angiebird): Reduce the buffer size according to sb_type
   tran_low_t *tcoeff[MAX_MB_PLANE];
@@ -141,6 +140,20 @@ typedef struct tx_size_rd_info_node {
   struct tx_size_rd_info_node *children[4];
 } TXB_RD_INFO_NODE;
 
+// Simple translation rd state for prune_comp_search_by_single_result
+typedef struct {
+  RD_STATS rd_stats;
+  RD_STATS rd_stats_y;
+  RD_STATS rd_stats_uv;
+  uint8_t blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
+  uint8_t skip;
+  uint8_t disable_skip;
+  uint8_t early_skipped;
+} SimpleRDState;
+
+// 4: NEAREST, NEW, NEAR, GLOBAL
+#define SINGLE_REF_MODES ((REF_FRAMES - 1) * 4)
+
 // Region size for mode decision sampling in the first pass of partition
 // search(two_pass_partition_search speed feature), in units of mi size(4).
 // Used by the mode_pruning_based_on_two_pass_partition_search speed feature.
@@ -166,6 +179,17 @@ typedef struct {
   int sample_counts;                // Number of samples collected.
 } FIRST_PARTITION_PASS_STATS;
 
+#define MAX_INTERP_FILTER_STATS 64
+typedef struct {
+  InterpFilters filters;
+  int_mv mv[2];
+  int8_t ref_frames[2];
+  COMPOUND_TYPE comp_type;
+} INTERPOLATION_FILTER_STATS;
+
+#if CONFIG_COLLECT_INTER_MODE_RD_STATS
+struct inter_modes_info;
+#endif
 typedef struct macroblock MACROBLOCK;
 struct macroblock {
   struct macroblock_plane plane[MAX_MB_PLANE];
@@ -182,6 +206,13 @@ struct macroblock {
 
   FIRST_PARTITION_PASS_STATS
   first_partition_pass_stats[FIRST_PARTITION_PASS_STATS_TABLES];
+
+  // [comp_idx][saved stat_idx]
+  INTERPOLATION_FILTER_STATS interp_filter_stats[2][MAX_INTERP_FILTER_STATS];
+  int interp_filter_stats_idx[2];
+
+  // prune_comp_search_by_single_result (3:MAX_REF_MV_SERCH)
+  SimpleRDState simple_rd_state[SINGLE_REF_MODES][3];
 
   // Activate constrained coding block partition search range.
   int use_cb_search_range;
@@ -213,7 +244,9 @@ struct macroblock {
   // for sub-8x8 blocks.
   int sadperbit4;
   int rdmult;
+  int cb_rdmult;
   int mb_energy;
+  int sb_energy_level;
   int *m_search_count_ptr;
   int *ex_search_count_ptr;
 
@@ -224,18 +257,15 @@ struct macroblock {
   BLOCK_SIZE min_partition_size;
   BLOCK_SIZE max_partition_size;
 
-  int mv_best_ref_index[REF_FRAMES];
   unsigned int max_mv_context[REF_FRAMES];
   unsigned int source_variance;
   unsigned int pred_sse[REF_FRAMES];
   int pred_mv_sad[REF_FRAMES];
 
-  int *nmvjointcost;
   int nmv_vec_cost[MV_JOINTS];
   int *nmvcost[2];
   int *nmvcost_hp[2];
   int **mv_cost_stack;
-  int **mvcost;
 
   int32_t *wsrc_buf;
   int32_t *mask_buf;
@@ -244,12 +274,36 @@ struct macroblock {
 
   PALETTE_BUFFER *palette_buffer;
 
+  CONV_BUF_TYPE *tmp_conv_dst;
+  uint8_t *tmp_obmc_bufs[2];
+
+  FRAME_CONTEXT *backup_tile_ctx;
+  // This context will be used to update color_map_cdf pointer which would be
+  // used during pack bitstream. For single thread and tile-multithreading case
+  // this ponter will be same as xd->tile_ctx, but for the case of row-mt:
+  // xd->tile_ctx will point to a temporary context while tile_pb_ctx will point
+  // to the accurate tile context.
+  FRAME_CONTEXT *tile_pb_ctx;
+
+#if CONFIG_COLLECT_INTER_MODE_RD_STATS
+  struct inter_modes_info *inter_modes_info;
+#endif
+
+  // buffer for hash value calculation of a block
+  // used only in av1_get_block_hash_value()
+  // [first hash/second hash]
+  // [two buffers used ping-pong]
+  uint32_t *hash_value_buffer[2][2];
+
+  CRC_CALCULATOR crc_calculator1;
+  CRC_CALCULATOR crc_calculator2;
+  int g_crc_initialized;
+
   // These define limits to motion vector components to prevent them
   // from extending outside the UMV borders
   MvLimits mv_limits;
 
   uint8_t blk_skip[MAX_MIB_SIZE * MAX_MIB_SIZE];
-  uint8_t blk_skip_drl[MAX_MIB_SIZE * MAX_MIB_SIZE];
 
   int skip;
   int skip_chroma_rd;
@@ -328,6 +382,9 @@ struct macroblock {
   // Store the second best motion vector during full-pixel motion search
   int_mv second_best_mv;
 
+  // Store the fractional best motion vector during sub/Qpel-pixel motion search
+  int_mv fractional_best_mv[3];
+
   // use default transform and skip transform type search for intra modes
   int use_default_intra_tx_type;
   // use default transform and skip transform type search for inter modes
@@ -335,7 +392,6 @@ struct macroblock {
 #if CONFIG_DIST_8X8
   int using_dist_8x8;
   aom_tune_metric tune_metric;
-  DECLARE_ALIGNED(16, int16_t, pred_luma[MAX_SB_SQUARE]);
 #endif  // CONFIG_DIST_8X8
   int comp_idx_cost[COMP_INDEX_CONTEXTS][2];
   int comp_group_idx_cost[COMP_GROUP_IDX_CONTEXTS][2];
@@ -343,6 +399,12 @@ struct macroblock {
   int tx_search_prune[EXT_TX_SET_TYPES];
   int must_find_valid_partition;
   int tx_split_prune_flag;  // Flag to skip tx split RD search.
+  int recalc_luma_mc_data;  // Flag to indicate recalculation of MC data during
+                            // interpolation filter search
+  // The likelihood of an edge existing in the block (using partial Canny edge
+  // detection). For reference, 556 is the value returned for a solid
+  // vertical black/white edge.
+  uint16_t edge_strength;
 };
 
 static INLINE int is_rect_tx_allowed_bsize(BLOCK_SIZE bsize) {
@@ -391,8 +453,38 @@ static INLINE int tx_size_to_depth(TX_SIZE tx_size, BLOCK_SIZE bsize) {
   return depth;
 }
 
+static INLINE void set_blk_skip(MACROBLOCK *x, int plane, int blk_idx,
+                                int skip) {
+  if (skip)
+    x->blk_skip[blk_idx] |= 1UL << plane;
+  else
+    x->blk_skip[blk_idx] &= ~(1UL << plane);
+#ifndef NDEBUG
+  // Set chroma planes to uninitialized states when luma is set to check if
+  // it will be set later
+  if (plane == 0) {
+    x->blk_skip[blk_idx] |= 1UL << (1 + 4);
+    x->blk_skip[blk_idx] |= 1UL << (2 + 4);
+  }
+
+  // Clear the initialization checking bit
+  x->blk_skip[blk_idx] &= ~(1UL << (plane + 4));
+#endif
+}
+
+static INLINE int is_blk_skip(MACROBLOCK *x, int plane, int blk_idx) {
+#ifndef NDEBUG
+  // Check if this is initialized
+  assert(!(x->blk_skip[blk_idx] & (1UL << (plane + 4))));
+
+  // The magic number is 0x77, this is to test if there is garbage data
+  assert((x->blk_skip[blk_idx] & 0x88) == 0);
+#endif
+  return (x->blk_skip[blk_idx] >> plane) & 1;
+}
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_BLOCK_H_
+#endif  // AOM_AV1_ENCODER_BLOCK_H_

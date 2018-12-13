@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_SEG_COMMON_H_
-#define AV1_COMMON_SEG_COMMON_H_
+#ifndef AOM_AV1_COMMON_SEG_COMMON_H_
+#define AOM_AV1_COMMON_SEG_COMMON_H_
 
 #include "aom_dsp/prob.h"
 
@@ -44,8 +44,12 @@ struct segmentation {
 
   int16_t feature_data[MAX_SEGMENTS][SEG_LVL_MAX];
   unsigned int feature_mask[MAX_SEGMENTS];
-  int last_active_segid;
-  int preskip_segid;
+  int last_active_segid;  // The highest numbered segment id that has some
+                          // enabled feature.
+  uint8_t segid_preskip;  // Whether the segment id will be read before the
+                          // skip syntax element.
+                          // 1: the segment id will be read first.
+                          // 0: the skip syntax element will be read first.
 };
 
 struct segmentation_probs {
@@ -62,28 +66,24 @@ static INLINE int segfeature_active(const struct segmentation *seg,
 }
 
 static INLINE void segfeatures_copy(struct segmentation *dst,
-                                    struct segmentation *src) {
+                                    const struct segmentation *src) {
   int i, j;
-  dst->preskip_segid = 0;
-  dst->last_active_segid = 0;
   for (i = 0; i < MAX_SEGMENTS; i++) {
     dst->feature_mask[i] = src->feature_mask[i];
     for (j = 0; j < SEG_LVL_MAX; j++) {
       dst->feature_data[i][j] = src->feature_data[i][j];
-      if (src->feature_mask[i] & (1 << j)) {
-        dst->preskip_segid |= j >= SEG_LVL_REF_FRAME;
-        dst->last_active_segid = i;
-        src->preskip_segid = dst->preskip_segid;
-        src->last_active_segid = dst->last_active_segid;
-      }
     }
   }
+  dst->segid_preskip = src->segid_preskip;
+  dst->last_active_segid = src->last_active_segid;
 }
 
 void av1_clearall_segfeatures(struct segmentation *seg);
 
 void av1_enable_segfeature(struct segmentation *seg, int segment_id,
                            SEG_LVL_FEATURES feature_id);
+
+void calculate_segdata(struct segmentation *seg);
 
 int av1_seg_feature_data_max(SEG_LVL_FEATURES feature_id);
 
@@ -101,4 +101,4 @@ static INLINE int get_segdata(const struct segmentation *seg, int segment_id,
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_SEG_COMMON_H_
+#endif  // AOM_AV1_COMMON_SEG_COMMON_H_

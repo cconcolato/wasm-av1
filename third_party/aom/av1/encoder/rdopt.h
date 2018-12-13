@@ -9,8 +9,10 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_RDOPT_H_
-#define AV1_ENCODER_RDOPT_H_
+#ifndef AOM_AV1_ENCODER_RDOPT_H_
+#define AOM_AV1_ENCODER_RDOPT_H_
+
+#include <stdbool.h>
 
 #include "av1/common/blockd.h"
 #include "av1/common/txb_common.h"
@@ -25,6 +27,10 @@ extern "C" {
 #endif
 
 #define MAX_REF_MV_SERCH 3
+#define DEFAULT_LUMA_INTERP_SKIP_FLAG 1
+#define DEFAULT_CHROMA_INTERP_SKIP_FLAG 2
+#define DEFAULT_INTERP_SKIP_FLAG \
+  (DEFAULT_LUMA_INTERP_SKIP_FLAG | DEFAULT_CHROMA_INTERP_SKIP_FLAG)
 
 struct TileInfo;
 struct macroblock;
@@ -54,11 +60,6 @@ static INLINE void av1_update_txb_coeff_cost(RD_STATS *rd_stats, int plane,
 }
 #endif
 
-typedef enum OUTPUT_STATUS {
-  OUTPUT_HAS_PREDICTED_PIXELS,
-  OUTPUT_HAS_DECODED_PIXELS
-} OUTPUT_STATUS;
-
 // Returns the number of colors in 'src'.
 int av1_count_colors(const uint8_t *src, int stride, int rows, int cols,
                      int *val_count);
@@ -73,8 +74,8 @@ int64_t av1_dist_8x8(const struct AV1_COMP *const cpi, const MACROBLOCK *x,
                      int bsh, int visible_w, int visible_h, int qindex);
 #endif
 
-static INLINE int av1_cost_skip_txb(MACROBLOCK *x, TXB_CTX *txb_ctx, int plane,
-                                    TX_SIZE tx_size) {
+static INLINE int av1_cost_skip_txb(MACROBLOCK *x, const TXB_CTX *const txb_ctx,
+                                    int plane, TX_SIZE tx_size) {
   const TX_SIZE txs_ctx = get_txsize_entropy_ctx(tx_size);
   const PLANE_TYPE plane_type = get_plane_type(plane);
   const LV_MAP_COEFF_COST *const coeff_costs =
@@ -83,20 +84,17 @@ static INLINE int av1_cost_skip_txb(MACROBLOCK *x, TXB_CTX *txb_ctx, int plane,
 }
 
 static INLINE int av1_cost_coeffs(const AV1_COMMON *const cm, MACROBLOCK *x,
-                                  BLOCK_SIZE plane_bsize, int plane,
-                                  int blk_row, int blk_col, int block,
-                                  TX_SIZE tx_size, const ENTROPY_CONTEXT *a,
-                                  const ENTROPY_CONTEXT *l,
+                                  int plane, int block, TX_SIZE tx_size,
+                                  const TX_TYPE tx_type,
+                                  const TXB_CTX *const txb_ctx,
                                   int use_fast_coef_costing) {
 #if TXCOEFF_COST_TIMER
   struct aom_usec_timer timer;
   aom_usec_timer_start(&timer);
 #endif
   (void)use_fast_coef_costing;
-  TXB_CTX txb_ctx;
-  get_txb_ctx(plane_bsize, tx_size, plane, a, l, &txb_ctx);
-  const int cost = av1_cost_coeffs_txb(cm, x, plane, blk_row, blk_col, block,
-                                       tx_size, &txb_ctx);
+  const int cost =
+      av1_cost_coeffs_txb(cm, x, plane, block, tx_size, tx_type, txb_ctx);
 #if TXCOEFF_COST_TIMER
   AV1_COMMON *tmp_cm = (AV1_COMMON *)&cpi->common;
   aom_usec_timer_mark(&timer);
@@ -119,7 +117,7 @@ unsigned int av1_high_get_sby_perpixel_variance(const struct AV1_COMP *cpi,
                                                 const struct buf_2d *ref,
                                                 BLOCK_SIZE bs, int bd);
 
-void av1_rd_pick_inter_mode_sb(const struct AV1_COMP *cpi,
+void av1_rd_pick_inter_mode_sb(struct AV1_COMP *cpi,
                                struct TileDataEnc *tile_data,
                                struct macroblock *x, int mi_row, int mi_col,
                                struct RD_STATS *rd_cost, BLOCK_SIZE bsize,
@@ -130,12 +128,36 @@ void av1_rd_pick_inter_mode_sb_seg_skip(
     struct macroblock *x, int mi_row, int mi_col, struct RD_STATS *rd_cost,
     BLOCK_SIZE bsize, PICK_MODE_CONTEXT *ctx, int64_t best_rd_so_far);
 
-void av1_inverse_transform_block_facade(MACROBLOCKD *xd, int plane, int block,
-                                        int blk_row, int blk_col, int eob,
-                                        int reduced_tx_set);
+/** Returns an integer indicating the strength of the edge.
+ * 0 means no edge found, 556 is the strength of a solid black/white edge,
+ * and the number may range higher if the signal is even stronger (e.g., on a
+ * corner). high_bd is a bool indicating the source should be treated
+ * as a 16-bit array. bd is the bit depth.
+ */
+uint16_t av1_edge_exists(const uint8_t *src, int src_stride, int w, int h,
+                         bool high_bd, int bd);
+
+/** Applies a Gaussian blur with sigma = 1.3. Used by av1_edge_exists and
+ * tests.
+ */
+void gaussian_blur(const uint8_t *src, int src_stride, int w, int h,
+                   uint8_t *dst, bool high_bd, int bd);
+
+/* Applies standard 3x3 Sobel matrix. */
+typedef struct {
+  int16_t x;
+  int16_t y;
+} sobel_xy;
+
+sobel_xy sobel(const uint8_t *input, int stride, int i, int j, bool high_bd);
+
+#if CONFIG_COLLECT_INTER_MODE_RD_STATS
+void av1_inter_mode_data_init(struct TileDataEnc *tile_data);
+void av1_inter_mode_data_fit(TileDataEnc *tile_data, int rdmult);
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_RDOPT_H_
+#endif  // AOM_AV1_ENCODER_RDOPT_H_

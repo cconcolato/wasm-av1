@@ -9,8 +9,9 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include "./aom_dsp_rtcd.h"
-#include "./av1_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
+#include "config/av1_rtcd.h"
+
 #include "av1/common/filter.h"
 #include "av1/common/scale.h"
 #include "aom_dsp/aom_filter.h"
@@ -53,7 +54,7 @@ static int fixed_point_scale_to_coarse_point_scale(int scale_fp) {
 }
 
 // Note: x and y are integer precision, mvq4 is q4 precision.
-MV32 av1_scale_mv(const MV *mvq4, int x, int y,
+MV32 av1_scale_mv(const MV32 *mvq4, int x, int y,
                   const struct scale_factors *sf) {
   const int x_off_q4 = scaled_x(x << SUBPEL_BITS, sf);
   const int y_off_q4 = scaled_y(y << SUBPEL_BITS, sf);

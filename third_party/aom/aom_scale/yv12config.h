@@ -9,14 +9,15 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_SCALE_YV12CONFIG_H_
-#define AOM_SCALE_YV12CONFIG_H_
+#ifndef AOM_AOM_SCALE_YV12CONFIG_H_
+#define AOM_AOM_SCALE_YV12CONFIG_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "./aom_config.h"
+#include "config/aom_config.h"
+
 #include "aom/aom_codec.h"
 #include "aom/aom_frame_buffer.h"
 #include "aom/aom_integer.h"
@@ -27,24 +28,26 @@ extern "C" {
 // TODO(jingning): Use unified inter predictor for encoder and
 // decoder during the development process. Revisit the frame border
 // to improve the decoder performance.
+#if CONFIG_REDUCED_ENCODER_BORDER
+#define AOM_BORDER_IN_PIXELS 160
+#else
 #define AOM_BORDER_IN_PIXELS 288
+#endif  // CONFIG_REDUCED_ENCODER_BORDER
 
 typedef struct yv12_buffer_config {
   union {
     struct {
       int y_width;
       int uv_width;
-      int alpha_width;
     };
-    int widths[3];
+    int widths[2];
   };
   union {
     struct {
       int y_height;
       int uv_height;
-      int alpha_height;
     };
-    int heights[3];
+    int heights[2];
   };
   union {
     struct {
@@ -64,23 +67,21 @@ typedef struct yv12_buffer_config {
     struct {
       int y_stride;
       int uv_stride;
-      int alpha_stride;
     };
-    int strides[3];
+    int strides[2];
   };
   union {
     struct {
       uint8_t *y_buffer;
       uint8_t *u_buffer;
       uint8_t *v_buffer;
-      uint8_t *alpha_buffer;
     };
-    uint8_t *buffers[4];
+    uint8_t *buffers[3];
   };
 
   // Indicate whether y_buffer, u_buffer, and v_buffer points to the internally
   // allocated memory or external buffers.
-  int use_external_refernce_buffers;
+  int use_external_reference_buffers;
   // This is needed to store y_buffer, u_buffer, and v_buffer when set reference
   // uses an external refernece, and restore those buffer pointers after the
   // external reference frame is no longer used.
@@ -135,4 +136,4 @@ int aom_free_frame_buffer(YV12_BUFFER_CONFIG *ybf);
 }
 #endif
 
-#endif  // AOM_SCALE_YV12CONFIG_H_
+#endif  // AOM_AOM_SCALE_YV12CONFIG_H_

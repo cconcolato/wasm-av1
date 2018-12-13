@@ -9,90 +9,12 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#include <emmintrin.h>
+#include <immintrin.h>
 
-#include "aom_dsp/x86/synonyms.h"
-
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_dsp_rtcd.h"
+#include "aom/aom_integer.h"
+#include "aom_dsp/x86/bitdepth_conversion_sse2.h"
 #include "aom_ports/mem.h"
-
-void aom_minmax_8x8_sse2(const uint8_t *s, int p, const uint8_t *d, int dp,
-                         int *min, int *max) {
-  __m128i u0, s0, d0, diff, maxabsdiff, minabsdiff, negdiff, absdiff0, absdiff;
-  u0 = _mm_setzero_si128();
-  // Row 0
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff0 = _mm_max_epi16(diff, negdiff);
-  // Row 1
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(absdiff0, absdiff);
-  minabsdiff = _mm_min_epi16(absdiff0, absdiff);
-  // Row 2
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 2 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 2 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-  // Row 3
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 3 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 3 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-  // Row 4
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 4 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 4 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-  // Row 5
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 5 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 5 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-  // Row 6
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 6 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 6 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-  // Row 7
-  s0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(s + 7 * p)), u0);
-  d0 = _mm_unpacklo_epi8(_mm_loadl_epi64((const __m128i *)(d + 7 * dp)), u0);
-  diff = _mm_subs_epi16(s0, d0);
-  negdiff = _mm_subs_epi16(u0, diff);
-  absdiff = _mm_max_epi16(diff, negdiff);
-  maxabsdiff = _mm_max_epi16(maxabsdiff, absdiff);
-  minabsdiff = _mm_min_epi16(minabsdiff, absdiff);
-
-  maxabsdiff = _mm_max_epi16(maxabsdiff, _mm_srli_si128(maxabsdiff, 8));
-  maxabsdiff = _mm_max_epi16(maxabsdiff, _mm_srli_epi64(maxabsdiff, 32));
-  maxabsdiff = _mm_max_epi16(maxabsdiff, _mm_srli_epi64(maxabsdiff, 16));
-  *max = _mm_extract_epi16(maxabsdiff, 0);
-
-  minabsdiff = _mm_min_epi16(minabsdiff, _mm_srli_si128(minabsdiff, 8));
-  minabsdiff = _mm_min_epi16(minabsdiff, _mm_srli_epi64(minabsdiff, 32));
-  minabsdiff = _mm_min_epi16(minabsdiff, _mm_srli_epi64(minabsdiff, 16));
-  *min = _mm_extract_epi16(minabsdiff, 0);
-}
 
 static void hadamard_col8_sse2(__m128i *in, int iter) {
   __m128i a0 = in[0];
@@ -170,8 +92,9 @@ static void hadamard_col8_sse2(__m128i *in, int iter) {
   }
 }
 
-void aom_hadamard_8x8_sse2(int16_t const *src_diff, int src_stride,
-                           int16_t *coeff) {
+static INLINE void hadamard_8x8_sse2(const int16_t *src_diff,
+                                     ptrdiff_t src_stride, tran_low_t *coeff,
+                                     int is_final) {
   __m128i src[8];
   src[0] = _mm_load_si128((const __m128i *)src_diff);
   src[1] = _mm_load_si128((const __m128i *)(src_diff += src_stride));
@@ -185,37 +108,70 @@ void aom_hadamard_8x8_sse2(int16_t const *src_diff, int src_stride,
   hadamard_col8_sse2(src, 0);
   hadamard_col8_sse2(src, 1);
 
-  _mm_store_si128((__m128i *)coeff, src[0]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[1]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[2]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[3]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[4]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[5]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[6]);
-  coeff += 8;
-  _mm_store_si128((__m128i *)coeff, src[7]);
+  if (is_final) {
+    store_tran_low(src[0], coeff);
+    coeff += 8;
+    store_tran_low(src[1], coeff);
+    coeff += 8;
+    store_tran_low(src[2], coeff);
+    coeff += 8;
+    store_tran_low(src[3], coeff);
+    coeff += 8;
+    store_tran_low(src[4], coeff);
+    coeff += 8;
+    store_tran_low(src[5], coeff);
+    coeff += 8;
+    store_tran_low(src[6], coeff);
+    coeff += 8;
+    store_tran_low(src[7], coeff);
+  } else {
+    int16_t *coeff16 = (int16_t *)coeff;
+    _mm_store_si128((__m128i *)coeff16, src[0]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[1]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[2]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[3]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[4]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[5]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[6]);
+    coeff16 += 8;
+    _mm_store_si128((__m128i *)coeff16, src[7]);
+  }
 }
 
-void aom_hadamard_16x16_sse2(int16_t const *src_diff, int src_stride,
-                             int16_t *coeff) {
+void aom_hadamard_8x8_sse2(const int16_t *src_diff, ptrdiff_t src_stride,
+                           tran_low_t *coeff) {
+  hadamard_8x8_sse2(src_diff, src_stride, coeff, 1);
+}
+
+static INLINE void hadamard_16x16_sse2(const int16_t *src_diff,
+                                       ptrdiff_t src_stride, tran_low_t *coeff,
+                                       int is_final) {
+  // For high bitdepths, it is unnecessary to store_tran_low
+  // (mult/unpack/store), then load_tran_low (load/pack) the same memory in the
+  // next stage.  Output to an intermediate buffer first, then store_tran_low()
+  // in the final stage.
+  DECLARE_ALIGNED(32, int16_t, temp_coeff[16 * 16]);
+  int16_t *t_coeff = temp_coeff;
+  int16_t *coeff16 = (int16_t *)coeff;
   int idx;
   for (idx = 0; idx < 4; ++idx) {
-    int16_t const *src_ptr =
+    const int16_t *src_ptr =
         src_diff + (idx >> 1) * 8 * src_stride + (idx & 0x01) * 8;
-    aom_hadamard_8x8_sse2(src_ptr, src_stride, coeff + idx * 64);
+    hadamard_8x8_sse2(src_ptr, src_stride, (tran_low_t *)(t_coeff + idx * 64),
+                      0);
   }
 
   for (idx = 0; idx < 64; idx += 8) {
-    __m128i coeff0 = _mm_load_si128((const __m128i *)coeff);
-    __m128i coeff1 = _mm_load_si128((const __m128i *)(coeff + 64));
-    __m128i coeff2 = _mm_load_si128((const __m128i *)(coeff + 128));
-    __m128i coeff3 = _mm_load_si128((const __m128i *)(coeff + 192));
+    __m128i coeff0 = _mm_load_si128((const __m128i *)t_coeff);
+    __m128i coeff1 = _mm_load_si128((const __m128i *)(t_coeff + 64));
+    __m128i coeff2 = _mm_load_si128((const __m128i *)(t_coeff + 128));
+    __m128i coeff3 = _mm_load_si128((const __m128i *)(t_coeff + 192));
 
     __m128i b0 = _mm_add_epi16(coeff0, coeff1);
     __m128i b1 = _mm_sub_epi16(coeff0, coeff1);
@@ -229,25 +185,86 @@ void aom_hadamard_16x16_sse2(int16_t const *src_diff, int src_stride,
 
     coeff0 = _mm_add_epi16(b0, b2);
     coeff1 = _mm_add_epi16(b1, b3);
-    _mm_store_si128((__m128i *)coeff, coeff0);
-    _mm_store_si128((__m128i *)(coeff + 64), coeff1);
-
     coeff2 = _mm_sub_epi16(b0, b2);
     coeff3 = _mm_sub_epi16(b1, b3);
-    _mm_store_si128((__m128i *)(coeff + 128), coeff2);
-    _mm_store_si128((__m128i *)(coeff + 192), coeff3);
 
-    coeff += 8;
+    if (is_final) {
+      store_tran_low(coeff0, coeff);
+      store_tran_low(coeff1, coeff + 64);
+      store_tran_low(coeff2, coeff + 128);
+      store_tran_low(coeff3, coeff + 192);
+      coeff += 8;
+    } else {
+      _mm_store_si128((__m128i *)coeff16, coeff0);
+      _mm_store_si128((__m128i *)(coeff16 + 64), coeff1);
+      _mm_store_si128((__m128i *)(coeff16 + 128), coeff2);
+      _mm_store_si128((__m128i *)(coeff16 + 192), coeff3);
+      coeff16 += 8;
+    }
+
+    t_coeff += 8;
   }
 }
 
-int aom_satd_sse2(const int16_t *coeff, int length) {
+void aom_hadamard_16x16_sse2(const int16_t *src_diff, ptrdiff_t src_stride,
+                             tran_low_t *coeff) {
+  hadamard_16x16_sse2(src_diff, src_stride, coeff, 1);
+}
+
+void aom_hadamard_32x32_sse2(const int16_t *src_diff, ptrdiff_t src_stride,
+                             tran_low_t *coeff) {
+  // For high bitdepths, it is unnecessary to store_tran_low
+  // (mult/unpack/store), then load_tran_low (load/pack) the same memory in the
+  // next stage.  Output to an intermediate buffer first, then store_tran_low()
+  // in the final stage.
+  DECLARE_ALIGNED(32, int16_t, temp_coeff[32 * 32]);
+  int16_t *t_coeff = temp_coeff;
+  int idx;
+  for (idx = 0; idx < 4; ++idx) {
+    const int16_t *src_ptr =
+        src_diff + (idx >> 1) * 16 * src_stride + (idx & 0x01) * 16;
+    hadamard_16x16_sse2(src_ptr, src_stride,
+                        (tran_low_t *)(t_coeff + idx * 256), 0);
+  }
+
+  for (idx = 0; idx < 256; idx += 8) {
+    __m128i coeff0 = _mm_load_si128((const __m128i *)t_coeff);
+    __m128i coeff1 = _mm_load_si128((const __m128i *)(t_coeff + 256));
+    __m128i coeff2 = _mm_load_si128((const __m128i *)(t_coeff + 512));
+    __m128i coeff3 = _mm_load_si128((const __m128i *)(t_coeff + 768));
+
+    __m128i b0 = _mm_add_epi16(coeff0, coeff1);
+    __m128i b1 = _mm_sub_epi16(coeff0, coeff1);
+    __m128i b2 = _mm_add_epi16(coeff2, coeff3);
+    __m128i b3 = _mm_sub_epi16(coeff2, coeff3);
+
+    b0 = _mm_srai_epi16(b0, 2);
+    b1 = _mm_srai_epi16(b1, 2);
+    b2 = _mm_srai_epi16(b2, 2);
+    b3 = _mm_srai_epi16(b3, 2);
+
+    coeff0 = _mm_add_epi16(b0, b2);
+    coeff1 = _mm_add_epi16(b1, b3);
+    store_tran_low(coeff0, coeff);
+    store_tran_low(coeff1, coeff + 256);
+
+    coeff2 = _mm_sub_epi16(b0, b2);
+    coeff3 = _mm_sub_epi16(b1, b3);
+    store_tran_low(coeff2, coeff + 512);
+    store_tran_low(coeff3, coeff + 768);
+
+    coeff += 8;
+    t_coeff += 8;
+  }
+}
+
+int aom_satd_sse2(const tran_low_t *coeff, int length) {
   int i;
   const __m128i zero = _mm_setzero_si128();
   __m128i accum = zero;
 
   for (i = 0; i < length; i += 8) {
-    const __m128i src_line = _mm_load_si128((const __m128i *)coeff);
+    const __m128i src_line = load_tran_low(coeff);
     const __m128i inv = _mm_sub_epi16(zero, src_line);
     const __m128i abs = _mm_max_epi16(src_line, inv);  // abs(src_line)
     const __m128i abs_lo = _mm_unpacklo_epi16(abs, zero);

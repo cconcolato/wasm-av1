@@ -63,9 +63,7 @@ main(int argc, char *argv[]) {
                     static int     i = 0;
                     
                     ++i;
-                    if (30 <= i && i < 40) {
-                        dump_raw_frame(af, i);
-                    }
+                    dump_raw_frame(af, i);
                 }
                 /*
                  * Run the decoder every time, so that we keep

@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_ENCODER_RESIZE_H_
-#define AV1_ENCODER_RESIZE_H_
+#ifndef AOM_AV1_COMMON_RESIZE_H_
+#define AOM_AV1_COMMON_RESIZE_H_
 
 #include <stdio.h>
 #include "aom/aom_integer.h"
@@ -91,12 +91,12 @@ void av1_calculate_unscaled_superres_size(int *width, int *height, int denom);
 
 void av1_superres_upscale(AV1_COMMON *cm, BufferPool *const pool);
 
-// Returns 1 if a superres upscaled frame is unscaled and 0 otherwise.
-static INLINE int av1_superres_unscaled(const AV1_COMMON *cm) {
+// Returns 1 if a superres upscaled frame is scaled and 0 otherwise.
+static INLINE int av1_superres_scaled(const AV1_COMMON *cm) {
   // Note: for some corner cases (e.g. cm->width of 1), there may be no scaling
   // required even though cm->superres_scale_denominator != SCALE_NUMERATOR.
   // So, the following check is more accurate.
-  return (cm->width == cm->superres_upscaled_width);
+  return !(cm->width == cm->superres_upscaled_width);
 }
 
 #define UPSCALE_NORMATIVE_TAPS 8
@@ -109,4 +109,4 @@ int32_t av1_get_upscale_convolve_step(int in_length, int out_length);
 }  // extern "C"
 #endif
 
-#endif  // AV1_ENCODER_RESIZE_H_
+#endif  // AOM_AV1_COMMON_RESIZE_H_

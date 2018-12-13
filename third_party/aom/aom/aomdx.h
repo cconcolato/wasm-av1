@@ -18,15 +18,15 @@
  * \brief Provides definitions for using AOM or AV1 within the aom Decoder
  *        interface.
  */
-#ifndef AOM_AOMDX_H_
-#define AOM_AOMDX_H_
+#ifndef AOM_AOM_AOMDX_H_
+#define AOM_AOM_AOMDX_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Include controls common to both the encoder and decoder */
-#include "./aom.h"
+#include "aom/aom.h"
 
 /*!\name Algorithm interface for AV1
  *
@@ -45,6 +45,7 @@ typedef struct Accounting Accounting;
 /** Callback that inspects decoder frame data.
  */
 typedef void (*aom_inspect_cb)(void *decoder, void *ctx);
+
 #endif
 
 /*!\brief Structure to hold inspection callback and context.
@@ -59,6 +60,45 @@ typedef struct aom_inspect_init {
   /*! Inspection context. */
   void *inspect_ctx;
 } aom_inspect_init;
+
+/*!\brief Structure to collect a buffer index when inspecting.
+ *
+ * Defines a structure to hold the buffer and return an index
+ * when calling decode from inspect. This enables us to decode
+ * non showable sub frames.
+ */
+typedef struct {
+  /*! Pointer for new position in compressed buffer after decoding 1 OBU. */
+  const unsigned char *buf;
+  /*! Index into reference buffer array to see result of decoding 1 OBU. */
+  int idx;
+  /*! Is a show existing frame. */
+  int show_existing;
+} Av1DecodeReturn;
+
+/*!\brief Structure to hold a tile's start address and size in the bitstream.
+ *
+ * Defines a structure to hold a tile's start address and size in the bitstream.
+ */
+typedef struct aom_tile_data {
+  /*! Tile data size. */
+  size_t coded_tile_data_size;
+  /*! Tile's start address. */
+  const void *coded_tile_data;
+  /*! Extra size information. */
+  size_t extra_size;
+} aom_tile_data;
+
+/*!\brief Structure to hold the external reference frame pointer.
+ *
+ * Define a structure to hold the external reference frame pointer.
+ */
+typedef struct av1_ext_ref_frame {
+  /*! Start pointer of external references. */
+  aom_image_t *img;
+  /*! Number of available external references. */
+  int num;
+} av1_ext_ref_frame_t;
 
 /*!\enum aom_dec_control_id
  * \brief AOM decoder control functions
@@ -94,6 +134,12 @@ enum aom_dec_control_id {
 
   /** control function to get the bit depth of the stream. */
   AV1D_GET_BIT_DEPTH,
+
+  /** control function to get the image format of the stream. */
+  AV1D_GET_IMG_FORMAT,
+
+  /** control function to get the size of the tile. */
+  AV1D_GET_TILE_SIZE,
 
   /** control function to set the byte alignment of the planes in the reference
    * buffers. Valid values are power of 2, from 32 to 1024. A value of 0 sets
@@ -145,6 +191,29 @@ enum aom_dec_control_id {
    *  1 indicates the tiles are coded in large-scale tile mode.
    */
   AV1_SET_TILE_MODE,
+  /** control function to get the frame header information of an encoded frame
+   * in the bitstream. This provides a way to access a frame's header data.
+   */
+  AV1D_GET_FRAME_HEADER_INFO,
+  /** control function to get the start address and size of a tile in the coded
+   * bitstream. This provides a way to access a specific tile's bitstream data.
+   */
+  AV1D_GET_TILE_DATA,
+  /** control function to set the external references' pointers in the decoder.
+   *  This is used while decoding the tile list OBU in large-scale tile coding
+   *  mode.
+   */
+  AV1D_SET_EXT_REF_PTR,
+  /** control function to enable the ext-tile software debug and testing code in
+   * the decoder.
+   */
+  AV1D_EXT_TILE_DEBUG,
+
+  /** control function to enable the row based multi-threading of decoding. A
+   * value that is equal to 1 indicates that row based multi-threading is
+   * enabled.
+   */
+  AV1D_SET_ROW_MT,
 
   /** control function to indicate whether bitstream is in Annex-B format. */
   AV1D_SET_IS_ANNEXB,
@@ -157,11 +226,28 @@ enum aom_dec_control_id {
    */
   AV1D_SET_OPERATING_POINT,
 
+  /** control function to indicate whether to output one frame per temporal
+   *  unit (the default), or one frame per spatial layer.
+   *  In a scalable stream, each temporal unit corresponds to a single "frame"
+   *  of video, and within a temporal unit there may be multiple spatial layers
+   *  with different versions of that frame.
+   *  For video playback, only the highest-quality version (within the
+   *  selected operating point) is needed, but for some use cases it is useful
+   *  to have access to multiple versions of a frame when they are available.
+   */
+  AV1D_SET_OUTPUT_ALL_LAYERS,
+
   /** control function to set an aom_inspect_cb callback that is invoked each
    * time a frame is decoded.  When compiled without --enable-inspection, this
    * returns AOM_CODEC_INCAPABLE.
    */
   AV1_SET_INSPECTION_CALLBACK,
+
+  /** control function to set the skip film grain flag. Valid values are
+   * integers. The decoder will skip the film grain when its value is set to
+   * nonzero. The default value is 0.
+   */
+  AV1D_SET_SKIP_FILM_GRAIN,
 
   AOM_DECODER_CTRL_ID_MAX,
 };
@@ -186,6 +272,10 @@ AOM_CTRL_USE_TYPE(AV1D_GET_DISPLAY_SIZE, int *)
 #define AOM_CTRL_AV1D_GET_DISPLAY_SIZE
 AOM_CTRL_USE_TYPE(AV1D_GET_BIT_DEPTH, unsigned int *)
 #define AOM_CTRL_AV1D_GET_BIT_DEPTH
+AOM_CTRL_USE_TYPE(AV1D_GET_IMG_FORMAT, aom_img_fmt_t *)
+#define AOM_CTRL_AV1D_GET_IMG_FORMAT
+AOM_CTRL_USE_TYPE(AV1D_GET_TILE_SIZE, unsigned int *)
+#define AOM_CTRL_AV1D_GET_TILE_SIZE
 AOM_CTRL_USE_TYPE(AV1D_GET_FRAME_SIZE, int *)
 #define AOM_CTRL_AV1D_GET_FRAME_SIZE
 AOM_CTRL_USE_TYPE(AV1_INVERT_TILE_DECODE_ORDER, int)
@@ -198,10 +288,24 @@ AOM_CTRL_USE_TYPE(AV1_SET_DECODE_TILE_COL, int)
 #define AOM_CTRL_AV1_SET_DECODE_TILE_COL
 AOM_CTRL_USE_TYPE(AV1_SET_TILE_MODE, unsigned int)
 #define AOM_CTRL_AV1_SET_TILE_MODE
+AOM_CTRL_USE_TYPE(AV1D_GET_FRAME_HEADER_INFO, aom_tile_data *)
+#define AOM_CTRL_AV1D_GET_FRAME_HEADER_INFO
+AOM_CTRL_USE_TYPE(AV1D_GET_TILE_DATA, aom_tile_data *)
+#define AOM_CTRL_AV1D_GET_TILE_DATA
+AOM_CTRL_USE_TYPE(AV1D_SET_EXT_REF_PTR, av1_ext_ref_frame_t *)
+#define AOM_CTRL_AV1D_SET_EXT_REF_PTR
+AOM_CTRL_USE_TYPE(AV1D_EXT_TILE_DEBUG, unsigned int)
+#define AOM_CTRL_AV1D_EXT_TILE_DEBUG
+AOM_CTRL_USE_TYPE(AV1D_SET_ROW_MT, unsigned int)
+#define AOM_CTRL_AV1D_SET_ROW_MT
+AOM_CTRL_USE_TYPE(AV1D_SET_SKIP_FILM_GRAIN, int)
+#define AOM_CTRL_AV1D_SET_SKIP_FILM_GRAIN
 AOM_CTRL_USE_TYPE(AV1D_SET_IS_ANNEXB, unsigned int)
 #define AOM_CTRL_AV1D_SET_IS_ANNEXB
 AOM_CTRL_USE_TYPE(AV1D_SET_OPERATING_POINT, int)
 #define AOM_CTRL_AV1D_SET_OPERATING_POINT
+AOM_CTRL_USE_TYPE(AV1D_SET_OUTPUT_ALL_LAYERS, int)
+#define AOM_CTRL_AV1D_SET_OUTPUT_ALL_LAYERS
 AOM_CTRL_USE_TYPE(AV1_SET_INSPECTION_CALLBACK, aom_inspect_init *)
 #define AOM_CTRL_AV1_SET_INSPECTION_CALLBACK
 /*!\endcond */
@@ -211,4 +315,4 @@ AOM_CTRL_USE_TYPE(AV1_SET_INSPECTION_CALLBACK, aom_inspect_init *)
 }  // extern "C"
 #endif
 
-#endif  // AOM_AOMDX_H_
+#endif  // AOM_AOM_AOMDX_H_

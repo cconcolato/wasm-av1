@@ -11,8 +11,9 @@
 
 #include <immintrin.h>
 
-#include "./aom_config.h"
-#include "./av1_rtcd.h"
+#include "config/aom_config.h"
+#include "config/av1_rtcd.h"
+
 #include "av1/common/restoration.h"
 #include "aom_dsp/x86/synonyms.h"
 #include "aom_dsp/x86/synonyms_avx2.h"
@@ -65,19 +66,19 @@ static __m256i scan_32(__m256i x) {
 // A+1 and B+1 should be aligned to 32 bytes. buf_stride should be a multiple
 // of 8.
 
-static void *memset_zero_avx(void *dest, const __m256i *zero, size_t count) {
+static void *memset_zero_avx(int32_t *dest, const __m256i *zero, size_t count) {
   unsigned int i = 0;
   for (i = 0; i < (count & 0xffffffe0); i += 32) {
-    _mm256_storeu_si256((__m256i *)((int *)dest + i), *zero);
-    _mm256_storeu_si256((__m256i *)((int *)dest + i + 8), *zero);
-    _mm256_storeu_si256((__m256i *)((int *)dest + i + 16), *zero);
-    _mm256_storeu_si256((__m256i *)((int *)dest + i + 24), *zero);
+    _mm256_storeu_si256((__m256i *)(dest + i), *zero);
+    _mm256_storeu_si256((__m256i *)(dest + i + 8), *zero);
+    _mm256_storeu_si256((__m256i *)(dest + i + 16), *zero);
+    _mm256_storeu_si256((__m256i *)(dest + i + 24), *zero);
   }
   for (; i < (count & 0xfffffff8); i += 8) {
-    _mm256_storeu_si256((__m256i *)((int *)dest + i), *zero);
+    _mm256_storeu_si256((__m256i *)(dest + i), *zero);
   }
   for (; i < count; i++) {
-    *(int *)dest = 0;
+    dest[i] = 0;
   }
   return dest;
 }
@@ -87,8 +88,8 @@ static void integral_images(const uint8_t *src, int src_stride, int width,
                             int buf_stride) {
   const __m256i zero = _mm256_setzero_si256();
   // Write out the zero top row
-  memset_zero_avx(A, &zero, (width + 1));
-  memset_zero_avx(B, &zero, (width + 1));
+  memset_zero_avx(A, &zero, (width + 8));
+  memset_zero_avx(B, &zero, (width + 8));
   for (int i = 0; i < height; ++i) {
     // Zero the left column.
     A[(i + 1) * buf_stride] = B[(i + 1) * buf_stride] = 0;
@@ -134,8 +135,8 @@ static void integral_images_highbd(const uint16_t *src, int src_stride,
                                    int32_t *B, int buf_stride) {
   const __m256i zero = _mm256_setzero_si256();
   // Write out the zero top row
-  memset_zero_avx(A, &zero, (width + 1));
-  memset_zero_avx(B, &zero, (width + 1));
+  memset_zero_avx(A, &zero, (width + 8));
+  memset_zero_avx(B, &zero, (width + 8));
 
   for (int i = 0; i < height; ++i) {
     // Zero the left column.
@@ -545,18 +546,18 @@ static void final_filter_fast(int32_t *dst, int dst_stride, const int32_t *A,
   }
 }
 
-void av1_selfguided_restoration_avx2(const uint8_t *dgd8, int width, int height,
-                                     int dgd_stride, int32_t *flt0,
-                                     int32_t *flt1, int flt_stride,
-                                     int sgr_params_idx, int bit_depth,
-                                     int highbd) {
+int av1_selfguided_restoration_avx2(const uint8_t *dgd8, int width, int height,
+                                    int dgd_stride, int32_t *flt0,
+                                    int32_t *flt1, int flt_stride,
+                                    int sgr_params_idx, int bit_depth,
+                                    int highbd) {
   // The ALIGN_POWER_OF_TWO macro here ensures that column 1 of Atl, Btl,
   // Ctl and Dtl is 32-byte aligned.
   const int buf_elts = ALIGN_POWER_OF_TWO(RESTORATION_PROC_UNIT_PELS, 3);
 
-  DECLARE_ALIGNED(32, int32_t,
-                  buf[4 * ALIGN_POWER_OF_TWO(RESTORATION_PROC_UNIT_PELS, 3)]);
-  memset(buf, 0, sizeof(buf));
+  int32_t *buf = aom_memalign(
+      32, 4 * sizeof(*buf) * ALIGN_POWER_OF_TWO(RESTORATION_PROC_UNIT_PELS, 3));
+  if (!buf) return -1;
 
   const int width_ext = width + 2 * SGRPROJ_BORDER_HORZ;
   const int height_ext = height + 2 * SGRPROJ_BORDER_VERT;
@@ -625,6 +626,8 @@ void av1_selfguided_restoration_avx2(const uint8_t *dgd8, int width, int height,
     final_filter(flt1, flt_stride, A, B, buf_stride, dgd8, dgd_stride, width,
                  height, highbd);
   }
+  aom_free(buf);
+  return 0;
 }
 
 void apply_selfguided_restoration_avx2(const uint8_t *dat8, int width,
@@ -635,8 +638,10 @@ void apply_selfguided_restoration_avx2(const uint8_t *dat8, int width,
   int32_t *flt0 = tmpbuf;
   int32_t *flt1 = flt0 + RESTORATION_UNITPELS_MAX;
   assert(width * height <= RESTORATION_UNITPELS_MAX);
-  av1_selfguided_restoration_avx2(dat8, width, height, stride, flt0, flt1,
-                                  width, eps, bit_depth, highbd);
+  const int ret = av1_selfguided_restoration_avx2(
+      dat8, width, height, stride, flt0, flt1, width, eps, bit_depth, highbd);
+  (void)ret;
+  assert(!ret);
   const sgr_params_type *const params = &sgr_params[eps];
   int xq[2];
   decode_xq(xqd, xq, params);

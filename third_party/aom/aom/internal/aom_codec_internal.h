@@ -38,11 +38,11 @@
  *       }
  *     </pre>
  *
- * Once initialized, the instance is manged using other functions from
+ * Once initialized, the instance is managed using other functions from
  * the aom_codec_* family.
  */
-#ifndef AOM_INTERNAL_AOM_CODEC_INTERNAL_H_
-#define AOM_INTERNAL_AOM_CODEC_INTERNAL_H_
+#ifndef AOM_AOM_INTERNAL_AOM_CODEC_INTERNAL_H_
+#define AOM_AOM_INTERNAL_AOM_CODEC_INTERNAL_H_
 #include "../aom_decoder.h"
 #include "../aom_encoder.h"
 #include <stdarg.h>
@@ -104,10 +104,9 @@ typedef aom_codec_err_t (*aom_codec_destroy_fn_t)(aom_codec_alg_priv_t *ctx);
  *
  * \param[in]      data    Pointer to a block of data to parse
  * \param[in]      data_sz Size of the data buffer
- * \param[in,out]  si      Pointer to stream info to update. The size member
- *                         \ref MUST be properly initialized, but \ref MAY be
- *                         clobbered by the algorithm. This parameter \ref MAY
- *                         be NULL.
+ * \param[in,out]  si      Pointer to stream info to update. The is_annexb
+ *                         member \ref MUST be properly initialized. This
+ *                         function sets the rest of the members.
  *
  * \retval #AOM_CODEC_OK
  *     Bitstream is parsable and stream information updated
@@ -121,10 +120,7 @@ typedef aom_codec_err_t (*aom_codec_peek_si_fn_t)(const uint8_t *data,
  * Returns information about the stream that has been parsed during decoding.
  *
  * \param[in]      ctx     Pointer to this instance's context
- * \param[in,out]  si      Pointer to stream info to update. The size member
- *                         \ref MUST be properly initialized, but \ref MAY be
- *                         clobbered by the algorithm. This parameter \ref MAY
- *                         be NULL.
+ * \param[in,out]  si      Pointer to stream info to update
  *
  * \retval #AOM_CODEC_OK
  *     Bitstream is parsable and stream information updated
@@ -421,7 +417,7 @@ struct aom_internal_error_info {
   aom_codec_err_t error_code;
   int has_detail;
   char detail[80];
-  int setjmp;
+  int setjmp;  // Boolean: whether 'jmp' is valid.
   jmp_buf jmp;
 };
 
@@ -442,4 +438,4 @@ void aom_merge_corrupted_flag(int *corrupted, int value);
 }  // extern "C"
 #endif
 
-#endif  // AOM_INTERNAL_AOM_CODEC_INTERNAL_H_
+#endif  // AOM_AOM_INTERNAL_AOM_CODEC_INTERNAL_H_

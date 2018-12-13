@@ -15,8 +15,9 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
@@ -810,11 +811,9 @@ using ::testing::make_tuple;
 //------------------------------------------------------------------------------
 // C functions
 const SadMxNParam c_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128_c, -1),
   make_tuple(128, 64, &aom_sad128x64_c, -1),
   make_tuple(64, 128, &aom_sad64x128_c, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64_c, -1),
   make_tuple(64, 32, &aom_sad64x32_c, -1),
   make_tuple(32, 64, &aom_sad32x64_c, -1),
@@ -828,11 +827,9 @@ const SadMxNParam c_tests[] = {
   make_tuple(8, 4, &aom_sad8x4_c, -1),
   make_tuple(4, 8, &aom_sad4x8_c, -1),
   make_tuple(4, 4, &aom_sad4x4_c, -1),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_c, 8),
   make_tuple(128, 64, &aom_highbd_sad128x64_c, 8),
   make_tuple(64, 128, &aom_highbd_sad64x128_c, 8),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_c, 8),
   make_tuple(64, 32, &aom_highbd_sad64x32_c, 8),
   make_tuple(32, 64, &aom_highbd_sad32x64_c, 8),
@@ -846,11 +843,9 @@ const SadMxNParam c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4_c, 8),
   make_tuple(4, 8, &aom_highbd_sad4x8_c, 8),
   make_tuple(4, 4, &aom_highbd_sad4x4_c, 8),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_c, 10),
   make_tuple(128, 64, &aom_highbd_sad128x64_c, 10),
   make_tuple(64, 128, &aom_highbd_sad64x128_c, 10),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_c, 10),
   make_tuple(64, 32, &aom_highbd_sad64x32_c, 10),
   make_tuple(32, 64, &aom_highbd_sad32x64_c, 10),
@@ -864,11 +859,9 @@ const SadMxNParam c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4_c, 10),
   make_tuple(4, 8, &aom_highbd_sad4x8_c, 10),
   make_tuple(4, 4, &aom_highbd_sad4x4_c, 10),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_c, 12),
   make_tuple(128, 64, &aom_highbd_sad128x64_c, 12),
   make_tuple(64, 128, &aom_highbd_sad64x128_c, 12),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_c, 12),
   make_tuple(64, 32, &aom_highbd_sad64x32_c, 12),
   make_tuple(32, 64, &aom_highbd_sad32x64_c, 12),
@@ -886,11 +879,9 @@ const SadMxNParam c_tests[] = {
 INSTANTIATE_TEST_CASE_P(C, SADTest, ::testing::ValuesIn(c_tests));
 
 const SadMxNAvgParam avg_c_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128_avg_c, -1),
   make_tuple(128, 64, &aom_sad128x64_avg_c, -1),
   make_tuple(64, 128, &aom_sad64x128_avg_c, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64_avg_c, -1),
   make_tuple(64, 32, &aom_sad64x32_avg_c, -1),
   make_tuple(32, 64, &aom_sad32x64_avg_c, -1),
@@ -904,11 +895,9 @@ const SadMxNAvgParam avg_c_tests[] = {
   make_tuple(8, 4, &aom_sad8x4_avg_c, -1),
   make_tuple(4, 8, &aom_sad4x8_avg_c, -1),
   make_tuple(4, 4, &aom_sad4x4_avg_c, -1),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_avg_c, 8),
   make_tuple(128, 64, &aom_highbd_sad128x64_avg_c, 8),
   make_tuple(64, 128, &aom_highbd_sad64x128_avg_c, 8),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_avg_c, 8),
   make_tuple(64, 32, &aom_highbd_sad64x32_avg_c, 8),
   make_tuple(32, 64, &aom_highbd_sad32x64_avg_c, 8),
@@ -922,11 +911,9 @@ const SadMxNAvgParam avg_c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4_avg_c, 8),
   make_tuple(4, 8, &aom_highbd_sad4x8_avg_c, 8),
   make_tuple(4, 4, &aom_highbd_sad4x4_avg_c, 8),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_avg_c, 10),
   make_tuple(128, 64, &aom_highbd_sad128x64_avg_c, 10),
   make_tuple(64, 128, &aom_highbd_sad64x128_avg_c, 10),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_avg_c, 10),
   make_tuple(64, 32, &aom_highbd_sad64x32_avg_c, 10),
   make_tuple(32, 64, &aom_highbd_sad32x64_avg_c, 10),
@@ -940,11 +927,9 @@ const SadMxNAvgParam avg_c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4_avg_c, 10),
   make_tuple(4, 8, &aom_highbd_sad4x8_avg_c, 10),
   make_tuple(4, 4, &aom_highbd_sad4x4_avg_c, 10),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128_avg_c, 12),
   make_tuple(128, 64, &aom_highbd_sad128x64_avg_c, 12),
   make_tuple(64, 128, &aom_highbd_sad64x128_avg_c, 12),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64_avg_c, 12),
   make_tuple(64, 32, &aom_highbd_sad64x32_avg_c, 12),
   make_tuple(32, 64, &aom_highbd_sad32x64_avg_c, 12),
@@ -963,11 +948,9 @@ INSTANTIATE_TEST_CASE_P(C, SADavgTest, ::testing::ValuesIn(avg_c_tests));
 
 // TODO(chengchen): add highbd tests
 const JntCompAvgParam jnt_comp_avg_c_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_jnt_comp_avg_pred_c, -1),
   make_tuple(128, 64, &aom_jnt_comp_avg_pred_c, -1),
   make_tuple(64, 128, &aom_jnt_comp_avg_pred_c, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_jnt_comp_avg_pred_c, -1),
   make_tuple(64, 32, &aom_jnt_comp_avg_pred_c, -1),
   make_tuple(32, 64, &aom_jnt_comp_avg_pred_c, -1),
@@ -987,11 +970,9 @@ INSTANTIATE_TEST_CASE_P(C, JntCompAvgTest,
                         ::testing::ValuesIn(jnt_comp_avg_c_tests));
 
 const JntSadMxNAvgParam jnt_avg_c_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_jnt_sad128x128_avg_c, -1),
   make_tuple(128, 64, &aom_jnt_sad128x64_avg_c, -1),
   make_tuple(64, 128, &aom_jnt_sad64x128_avg_c, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_jnt_sad64x64_avg_c, -1),
   make_tuple(64, 32, &aom_jnt_sad64x32_avg_c, -1),
   make_tuple(32, 64, &aom_jnt_sad32x64_avg_c, -1),
@@ -1009,11 +990,9 @@ const JntSadMxNAvgParam jnt_avg_c_tests[] = {
 INSTANTIATE_TEST_CASE_P(C, JntSADavgTest, ::testing::ValuesIn(jnt_avg_c_tests));
 
 const SadMxNx4Param x4d_c_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128x4d_c, -1),
   make_tuple(128, 64, &aom_sad128x64x4d_c, -1),
   make_tuple(64, 128, &aom_sad64x128x4d_c, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64x4d_c, -1),
   make_tuple(64, 32, &aom_sad64x32x4d_c, -1),
   make_tuple(32, 64, &aom_sad32x64x4d_c, -1),
@@ -1027,11 +1006,9 @@ const SadMxNx4Param x4d_c_tests[] = {
   make_tuple(8, 4, &aom_sad8x4x4d_c, -1),
   make_tuple(4, 8, &aom_sad4x8x4d_c, -1),
   make_tuple(4, 4, &aom_sad4x4x4d_c, -1),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128x4d_c, 8),
   make_tuple(128, 64, &aom_highbd_sad128x64x4d_c, 8),
   make_tuple(64, 128, &aom_highbd_sad64x128x4d_c, 8),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64x4d_c, 8),
   make_tuple(64, 32, &aom_highbd_sad64x32x4d_c, 8),
   make_tuple(32, 64, &aom_highbd_sad32x64x4d_c, 8),
@@ -1045,11 +1022,9 @@ const SadMxNx4Param x4d_c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4x4d_c, 8),
   make_tuple(4, 8, &aom_highbd_sad4x8x4d_c, 8),
   make_tuple(4, 4, &aom_highbd_sad4x4x4d_c, 8),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128x4d_c, 10),
   make_tuple(128, 64, &aom_highbd_sad128x64x4d_c, 10),
   make_tuple(64, 128, &aom_highbd_sad64x128x4d_c, 10),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64x4d_c, 10),
   make_tuple(64, 32, &aom_highbd_sad64x32x4d_c, 10),
   make_tuple(32, 64, &aom_highbd_sad32x64x4d_c, 10),
@@ -1063,11 +1038,9 @@ const SadMxNx4Param x4d_c_tests[] = {
   make_tuple(8, 4, &aom_highbd_sad8x4x4d_c, 10),
   make_tuple(4, 8, &aom_highbd_sad4x8x4d_c, 10),
   make_tuple(4, 4, &aom_highbd_sad4x4x4d_c, 10),
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_highbd_sad128x128x4d_c, 12),
   make_tuple(128, 64, &aom_highbd_sad128x64x4d_c, 12),
   make_tuple(64, 128, &aom_highbd_sad64x128x4d_c, 12),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_highbd_sad64x64x4d_c, 12),
   make_tuple(64, 32, &aom_highbd_sad64x32x4d_c, 12),
   make_tuple(32, 64, &aom_highbd_sad32x64x4d_c, 12),
@@ -1110,11 +1083,9 @@ INSTANTIATE_TEST_CASE_P(NEON, SADx4Test, ::testing::ValuesIn(x4d_neon_tests));
 // x86 functions
 #if HAVE_SSE2
 const SadMxNParam sse2_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128_sse2, -1),
   make_tuple(128, 64, &aom_sad128x64_sse2, -1),
   make_tuple(64, 128, &aom_sad64x128_sse2, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64_sse2, -1),
   make_tuple(64, 32, &aom_sad64x32_sse2, -1),
   make_tuple(32, 64, &aom_sad32x64_sse2, -1),
@@ -1165,11 +1136,9 @@ const SadMxNParam sse2_tests[] = {
 INSTANTIATE_TEST_CASE_P(SSE2, SADTest, ::testing::ValuesIn(sse2_tests));
 
 const SadMxNAvgParam avg_sse2_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128_avg_sse2, -1),
   make_tuple(128, 64, &aom_sad128x64_avg_sse2, -1),
   make_tuple(64, 128, &aom_sad64x128_avg_sse2, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64_avg_sse2, -1),
   make_tuple(64, 32, &aom_sad64x32_avg_sse2, -1),
   make_tuple(32, 64, &aom_sad32x64_avg_sse2, -1),
@@ -1220,11 +1189,9 @@ const SadMxNAvgParam avg_sse2_tests[] = {
 INSTANTIATE_TEST_CASE_P(SSE2, SADavgTest, ::testing::ValuesIn(avg_sse2_tests));
 
 const SadMxNx4Param x4d_sse2_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_sad128x128x4d_sse2, -1),
   make_tuple(128, 64, &aom_sad128x64x4d_sse2, -1),
   make_tuple(64, 128, &aom_sad64x128x4d_sse2, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_sad64x64x4d_sse2, -1),
   make_tuple(64, 32, &aom_sad64x32x4d_sse2, -1),
   make_tuple(32, 64, &aom_sad32x64x4d_sse2, -1),
@@ -1319,11 +1286,9 @@ INSTANTIATE_TEST_CASE_P(SSE2, JntSADTest,
 
 #if HAVE_SSSE3
 const JntCompAvgParam jnt_comp_avg_ssse3_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_jnt_comp_avg_pred_ssse3, -1),
   make_tuple(128, 64, &aom_jnt_comp_avg_pred_ssse3, -1),
   make_tuple(64, 128, &aom_jnt_comp_avg_pred_ssse3, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_jnt_comp_avg_pred_ssse3, -1),
   make_tuple(64, 32, &aom_jnt_comp_avg_pred_ssse3, -1),
   make_tuple(32, 64, &aom_jnt_comp_avg_pred_ssse3, -1),
@@ -1344,11 +1309,9 @@ INSTANTIATE_TEST_CASE_P(SSSE3, JntCompAvgTest,
                         ::testing::ValuesIn(jnt_comp_avg_ssse3_tests));
 
 const JntSadMxNAvgParam jnt_avg_ssse3_tests[] = {
-#if CONFIG_AV1
   make_tuple(128, 128, &aom_jnt_sad128x128_avg_ssse3, -1),
   make_tuple(128, 64, &aom_jnt_sad128x64_avg_ssse3, -1),
   make_tuple(64, 128, &aom_jnt_sad64x128_avg_ssse3, -1),
-#endif  // CONFIG_AV1
   make_tuple(64, 64, &aom_jnt_sad64x64_avg_ssse3, -1),
   make_tuple(64, 32, &aom_jnt_sad64x32_avg_ssse3, -1),
   make_tuple(32, 64, &aom_jnt_sad32x64_avg_ssse3, -1),

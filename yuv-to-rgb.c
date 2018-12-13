@@ -46,7 +46,7 @@ static int foo;
 static int frame;
 
 void
-AVX_YUV_to_RGB(unsigned char *dst, unsigned short *src, int width, int height) {
+AVX_YUV16_to_RGB(unsigned char *dst, unsigned short *src, int width, int height, int channel, int scale) {
     int             r, g, b;
     unsigned short  *y, *u, *v, *uline, *vline;
     int             w, h;
@@ -64,9 +64,116 @@ AVX_YUV_to_RGB(unsigned char *dst, unsigned short *src, int width, int height) {
         uline = u;
         vline = v;
         for (w = 0; w < width; w++, y++) {
-            r = *y + T1[*vline];
-            g = *y + T2[*vline] + T3[*uline];
-            b = *y + T4[*uline];
+            if (channel == 0) {
+                r = *y/scale + T1[*vline/scale];
+                g = *y/scale + T2[*vline/scale] + T3[*uline/scale];
+                b = *y/scale + T4[*uline/scale];
+            } else if (channel == 1) {
+                r = *y + T1[*uline];
+                g = *y + T2[*uline] + T3[*vline];
+                b = *y + T4[*vline];
+            } else if (channel == 3) {
+                r = *y/scale;
+                g = *y/scale;
+                b = *y/scale;
+            } else if (channel == 4) {
+                r = *uline/scale;
+                g = *uline/scale;
+                b = *uline/scale;
+            } else if (channel == 5) {
+                r = *vline/scale;
+                g = *vline/scale;
+                b = *vline/scale;
+            } else if (channel == 6) {
+                r = *y + T1[*vline];
+                g = *y + T2[*vline] + T3[*uline];
+                b = *y + T4[*uline];
+            } else if (channel == 7) {
+                r = *y + T1[*vline];
+                g = 0;
+                b = 0;
+            } else if (channel == 8) {
+                r = 0;
+                g = *y + T2[*vline] + T3[*uline];
+                b = 0;
+            } else if (channel == 9) {
+                r = 0;
+                g = 0;
+                b = *y + T4[*uline];
+            }
+            dst[0] = clamp(r);     // 16-bit to 8-bit, chuck precision
+            dst[1] = clamp(g);
+            dst[2] = clamp(b);
+            dst += ZOF_RGB;
+            if (w & 0x01) {
+                uline++;
+                vline++;
+            }
+        }
+        if (h & 0x01) {
+            u += width / 2;
+            v += width / 2;
+        }
+    }
+}
+
+
+void
+AVX_YUV8_to_RGB(unsigned char *dst, unsigned char *src, int width, int height, int channel, int scale) {
+    int             r, g, b;
+    unsigned char  *y, *u, *v, *uline, *vline;
+    int             w, h;
+
+    if (initialized == 0) {
+        initialized = !0;
+        build_tables();
+    }
+    // Setup pointers to the Y, U, V planes
+    y = src;
+    u = src + (width * height);
+    v = u + (width * height) / 4;   // Each chroma does 4 pixels in 4:2:0
+    // Loop the image, taking into account sub-sample for the chroma channels
+    for (h = 0; h < height; h++) {
+        uline = u;
+        vline = v;
+        for (w = 0; w < width; w++, y++) {
+            if (channel == 0) {
+                r = *y/scale + T1[*vline/scale];
+                g = *y/scale + T2[*vline/scale] + T3[*uline/scale];
+                b = *y/scale + T4[*uline/scale];
+            } else if (channel == 1) {
+                r = *y + T1[*uline];
+                g = *y + T2[*uline] + T3[*vline];
+                b = *y + T4[*vline];
+            } else if (channel == 3) {
+                r = *y/scale;
+                g = *y/scale;
+                b = *y/scale;
+            } else if (channel == 4) {
+                r = *uline/scale;
+                g = *uline/scale;
+                b = *uline/scale;
+            } else if (channel == 5) {
+                r = *vline/scale;
+                g = *vline/scale;
+                b = *vline/scale;
+            } else if (channel == 6) {
+                r = *y + T1[*vline];
+                g = *y + T2[*vline] + T3[*uline];
+                b = *y + T4[*uline];
+            } else if (channel == 7) {
+                r = *y + T1[*vline];
+                g = 0;
+                b = 0;
+            } else if (channel == 8) {
+                r = 0;
+                g = *y + T2[*vline] + T3[*uline];
+                b = 0;
+            } else if (channel == 9) {
+                r = 0;
+                g = 0;
+                b = *y + T4[*uline];
+            }
             dst[0] = clamp(r);     // 16-bit to 8-bit, chuck precision
             dst[1] = clamp(g);
             dst[2] = clamp(b);

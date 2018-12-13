@@ -31,7 +31,7 @@ static void generate_kernels(ACMRandom *rnd, InterpKernel hkernel,
   hkernel[2] = hkernel[4] =
       WIENER_FILT_TAP2_MINV +
       rnd->PseudoUniform(WIENER_FILT_TAP2_MAXV + 1 - WIENER_FILT_TAP2_MINV);
-  hkernel[3] = -(hkernel[0] + hkernel[1] + hkernel[2]);
+  hkernel[3] = -2 * (hkernel[0] + hkernel[1] + hkernel[2]);
   hkernel[7] = 0;
 
   vkernel[0] = vkernel[6] =
@@ -43,7 +43,7 @@ static void generate_kernels(ACMRandom *rnd, InterpKernel hkernel,
   vkernel[2] = vkernel[4] =
       WIENER_FILT_TAP2_MINV +
       rnd->PseudoUniform(WIENER_FILT_TAP2_MAXV + 1 - WIENER_FILT_TAP2_MINV);
-  vkernel[3] = -(vkernel[0] + vkernel[1] + vkernel[2]);
+  vkernel[3] = -2 * (vkernel[0] + vkernel[1] + vkernel[2]);
   vkernel[7] = 0;
 }
 
@@ -52,9 +52,13 @@ namespace AV1HiprecConvolve {
 ::testing::internal::ParamGenerator<HiprecConvolveParam> BuildParams(
     hiprec_convolve_func filter) {
   const HiprecConvolveParam params[] = {
-    make_tuple(8, 8, 50000, filter),
-    make_tuple(64, 64, 1000, filter),
-    make_tuple(32, 8, 10000, filter),
+    make_tuple(8, 8, 50000, filter),   make_tuple(8, 4, 50000, filter),
+    make_tuple(64, 24, 1000, filter),  make_tuple(64, 64, 1000, filter),
+    make_tuple(64, 56, 1000, filter),  make_tuple(32, 8, 10000, filter),
+    make_tuple(32, 28, 10000, filter), make_tuple(32, 32, 10000, filter),
+    make_tuple(16, 34, 10000, filter), make_tuple(32, 34, 10000, filter),
+    make_tuple(64, 34, 1000, filter),  make_tuple(8, 17, 10000, filter),
+    make_tuple(16, 17, 10000, filter), make_tuple(32, 17, 10000, filter)
   };
   return ::testing::ValuesIn(params);
 }

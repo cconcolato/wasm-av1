@@ -22,12 +22,8 @@ endif()
 
 set(CMAKE_C_COMPILER ${CROSS}gcc)
 set(CMAKE_CXX_COMPILER ${CROSS}g++)
-
-# Assembler sources must be converted for armv7-mingw-gcc targets.
-set(AOM_ADS2GAS_REQUIRED 1)
-set(AOM_ADS2GAS "${CMAKE_CURRENT_SOURCE_DIR}/build/make/ads2gas.pl")
-set(AOM_ADS2GAS_OPTS "-thumb;-noelf")
-set(AOM_GAS_EXT "S")
+set(CMAKE_AR ${CROSS}ar CACHE FILEPATH Archiver)
+set(CMAKE_RANLIB ${CROSS}ranlib CACHE FILEPATH Indexer)
 
 # No runtime cpu detect for armv7-mingw-gcc.
 set(CONFIG_RUNTIME_CPU_DETECT 0 CACHE NUMBER "")

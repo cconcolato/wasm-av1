@@ -10,7 +10,7 @@
  */
 #include <immintrin.h>
 
-#include "./av1_rtcd.h"
+#include "config/av1_rtcd.h"
 
 #include "av1/common/cfl.h"
 
@@ -27,21 +27,21 @@
       subsample_##bd##_##sub##_8x8_ssse3,   /* 8x8 */                      \
       subsample_##bd##_##sub##_16x16_ssse3, /* 16x16 */                    \
       subsample_##bd##_##sub##_32x32_avx2,  /* 32x32 */                    \
-      cfl_subsample_##bd##_null,            /* 64x64 (invalid CFL size) */ \
+      NULL,                                 /* 64x64 (invalid CFL size) */ \
       subsample_##bd##_##sub##_4x8_ssse3,   /* 4x8 */                      \
       subsample_##bd##_##sub##_8x4_ssse3,   /* 8x4 */                      \
       subsample_##bd##_##sub##_8x16_ssse3,  /* 8x16 */                     \
       subsample_##bd##_##sub##_16x8_ssse3,  /* 16x8 */                     \
       subsample_##bd##_##sub##_16x32_ssse3, /* 16x32 */                    \
       subsample_##bd##_##sub##_32x16_avx2,  /* 32x16 */                    \
-      cfl_subsample_##bd##_null,            /* 32x64 (invalid CFL size) */ \
-      cfl_subsample_##bd##_null,            /* 64x32 (invalid CFL size) */ \
+      NULL,                                 /* 32x64 (invalid CFL size) */ \
+      NULL,                                 /* 64x32 (invalid CFL size) */ \
       subsample_##bd##_##sub##_4x16_ssse3,  /* 4x16  */                    \
       subsample_##bd##_##sub##_16x4_ssse3,  /* 16x4  */                    \
       subsample_##bd##_##sub##_8x32_ssse3,  /* 8x32  */                    \
       subsample_##bd##_##sub##_32x8_avx2,   /* 32x8  */                    \
-      cfl_subsample_##bd##_null,            /* 16x64 (invalid CFL size) */ \
-      cfl_subsample_##bd##_null,            /* 64x16 (invalid CFL size) */ \
+      NULL,                                 /* 16x64 (invalid CFL size) */ \
+      NULL,                                 /* 64x16 (invalid CFL size) */ \
     };                                                                     \
     return subfn_##sub[tx_size];                                           \
   }
@@ -60,7 +60,7 @@
  */
 static void cfl_luma_subsampling_420_lbd_avx2(const uint8_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;                               // Forever 32
   const __m256i twos = _mm256_set1_epi8(2);  // Thirty two twos
@@ -95,7 +95,7 @@ CFL_GET_SUBSAMPLE_FUNCTION_AVX2(420, lbd)
  */
 static void cfl_luma_subsampling_422_lbd_avx2(const uint8_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;                                // Forever 32
   const __m256i fours = _mm256_set1_epi8(4);  // Thirty two fours
@@ -123,7 +123,7 @@ CFL_GET_SUBSAMPLE_FUNCTION_AVX2(422, lbd)
  */
 static void cfl_luma_subsampling_444_lbd_avx2(const uint8_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;  // Forever 32
   __m256i *row = (__m256i *)pred_buf_q3;
@@ -161,7 +161,7 @@ CFL_GET_SUBSAMPLE_FUNCTION_AVX2(444, lbd)
  */
 static void cfl_luma_subsampling_420_hbd_avx2(const uint16_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;  // Forever 32
   const int luma_stride = input_stride << 1;
@@ -201,7 +201,7 @@ CFL_GET_SUBSAMPLE_FUNCTION_AVX2(420, hbd)
  */
 static void cfl_luma_subsampling_422_hbd_avx2(const uint16_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;  // Forever 32
   __m256i *row = (__m256i *)pred_buf_q3;
@@ -223,7 +223,7 @@ CFL_GET_SUBSAMPLE_FUNCTION_AVX2(422, hbd)
 
 static void cfl_luma_subsampling_444_hbd_avx2(const uint16_t *input,
                                               int input_stride,
-                                              int16_t *pred_buf_q3, int width,
+                                              uint16_t *pred_buf_q3, int width,
                                               int height) {
   (void)width;  // Forever 32
   __m256i *row = (__m256i *)pred_buf_q3;
@@ -279,21 +279,21 @@ cfl_predict_lbd_fn get_predict_lbd_fn_avx2(TX_SIZE tx_size) {
     predict_lbd_8x8_ssse3,   /* 8x8 */
     predict_lbd_16x16_ssse3, /* 16x16 */
     predict_lbd_32x32_avx2,  /* 32x32 */
-    cfl_predict_lbd_null,    /* 64x64 (invalid CFL size) */
+    NULL,                    /* 64x64 (invalid CFL size) */
     predict_lbd_4x8_ssse3,   /* 4x8 */
     predict_lbd_8x4_ssse3,   /* 8x4 */
     predict_lbd_8x16_ssse3,  /* 8x16 */
     predict_lbd_16x8_ssse3,  /* 16x8 */
     predict_lbd_16x32_ssse3, /* 16x32 */
     predict_lbd_32x16_avx2,  /* 32x16 */
-    cfl_predict_lbd_null,    /* 32x64 (invalid CFL size) */
-    cfl_predict_lbd_null,    /* 64x32 (invalid CFL size) */
+    NULL,                    /* 32x64 (invalid CFL size) */
+    NULL,                    /* 64x32 (invalid CFL size) */
     predict_lbd_4x16_ssse3,  /* 4x16  */
     predict_lbd_16x4_ssse3,  /* 16x4  */
     predict_lbd_8x32_ssse3,  /* 8x32  */
     predict_lbd_32x8_avx2,   /* 32x8  */
-    cfl_predict_lbd_null,    /* 16x64 (invalid CFL size) */
-    cfl_predict_lbd_null,    /* 64x16 (invalid CFL size) */
+    NULL,                    /* 16x64 (invalid CFL size) */
+    NULL,                    /* 64x16 (invalid CFL size) */
   };
   // Modulo TX_SIZES_ALL to ensure that an attacker won't be able to index the
   // function pointer array out of bounds.
@@ -352,21 +352,21 @@ cfl_predict_hbd_fn get_predict_hbd_fn_avx2(TX_SIZE tx_size) {
     predict_hbd_8x8_ssse3,  /* 8x8 */
     predict_hbd_16x16_avx2, /* 16x16 */
     predict_hbd_32x32_avx2, /* 32x32 */
-    cfl_predict_hbd_null,   /* 64x64 (invalid CFL size) */
+    NULL,                   /* 64x64 (invalid CFL size) */
     predict_hbd_4x8_ssse3,  /* 4x8 */
     predict_hbd_8x4_ssse3,  /* 8x4 */
     predict_hbd_8x16_ssse3, /* 8x16 */
     predict_hbd_16x8_avx2,  /* 16x8 */
     predict_hbd_16x32_avx2, /* 16x32 */
     predict_hbd_32x16_avx2, /* 32x16 */
-    cfl_predict_hbd_null,   /* 32x64 (invalid CFL size) */
-    cfl_predict_hbd_null,   /* 64x32 (invalid CFL size) */
+    NULL,                   /* 32x64 (invalid CFL size) */
+    NULL,                   /* 64x32 (invalid CFL size) */
     predict_hbd_4x16_ssse3, /* 4x16  */
     predict_hbd_16x4_avx2,  /* 16x4  */
     predict_hbd_8x32_ssse3, /* 8x32  */
     predict_hbd_32x8_avx2,  /* 32x8  */
-    cfl_predict_hbd_null,   /* 16x64 (invalid CFL size) */
-    cfl_predict_hbd_null,   /* 64x16 (invalid CFL size) */
+    NULL,                   /* 16x64 (invalid CFL size) */
+    NULL,                   /* 64x16 (invalid CFL size) */
   };
   // Modulo TX_SIZES_ALL to ensure that an attacker won't be able to index the
   // function pointer array out of bounds.
@@ -395,41 +395,42 @@ static INLINE __m256i _mm256_addl_epi16(__m256i a) {
                           _mm256_unpackhi_epi16(a, _mm256_setzero_si256()));
 }
 
-static INLINE void subtract_average_avx2(int16_t *pred_buf, int width,
+static INLINE void subtract_average_avx2(const uint16_t *src_ptr,
+                                         int16_t *dst_ptr, int width,
                                          int height, int round_offset,
                                          int num_pel_log2) {
   // Use SSE2 version for smaller widths
   assert(width == 16 || width == 32);
-  __m256i *row = (__m256i *)pred_buf;
-  const __m256i *const end = row + height * CFL_BUF_LINE_I256;
+
+  const __m256i *src = (__m256i *)src_ptr;
+  const __m256i *const end = src + height * CFL_BUF_LINE_I256;
   // To maximize usage of the AVX2 registers, we sum two rows per loop
   // iteration
   const int step = 2 * CFL_BUF_LINE_I256;
-  __m256i sum = _mm256_setzero_si256();
 
+  __m256i sum = _mm256_setzero_si256();
   // For width 32, we use a second sum accumulator to reduce accumulator
   // dependencies in the loop.
   __m256i sum2;
   if (width == 32) sum2 = _mm256_setzero_si256();
+
   do {
     // Add top row to the bottom row
-    __m256i l0 = _mm256_add_epi16(_mm256_loadu_si256(row),
-                                  _mm256_loadu_si256(row + CFL_BUF_LINE_I256));
+    __m256i l0 = _mm256_add_epi16(_mm256_loadu_si256(src),
+                                  _mm256_loadu_si256(src + CFL_BUF_LINE_I256));
     sum = _mm256_add_epi32(sum, _mm256_addl_epi16(l0));
     if (width == 32) { /* Don't worry, this if it gets optimized out. */
       // Add the second part of the top row to the second part of the bottom row
       __m256i l1 =
-          _mm256_add_epi16(_mm256_loadu_si256(row + 1),
-                           _mm256_loadu_si256(row + 1 + CFL_BUF_LINE_I256));
-      // Store the sum of the second part in the same accumulator as the first
-      // part
+          _mm256_add_epi16(_mm256_loadu_si256(src + 1),
+                           _mm256_loadu_si256(src + 1 + CFL_BUF_LINE_I256));
       sum2 = _mm256_add_epi32(sum2, _mm256_addl_epi16(l1));
     }
-  } while ((row += step) < end);
-  // Combine both sum accumulator
+    src += step;
+  } while (src < end);
+  // Combine both sum accumulators
   if (width == 32) sum = _mm256_add_epi32(sum, sum2);
 
-  // The sum accumulator now contains the 8 lanes
   __m256i fill = fill_sum_epi32(sum);
 
   __m256i avg_epi16 = _mm256_srli_epi32(
@@ -437,15 +438,18 @@ static INLINE void subtract_average_avx2(int16_t *pred_buf, int width,
   avg_epi16 = _mm256_packs_epi32(avg_epi16, avg_epi16);
 
   // Store and subtract loop
-  row = (__m256i *)pred_buf;
+  src = (__m256i *)src_ptr;
+  __m256i *dst = (__m256i *)dst_ptr;
   do {
-    _mm256_storeu_si256(row,
-                        _mm256_sub_epi16(_mm256_loadu_si256(row), avg_epi16));
+    _mm256_storeu_si256(dst,
+                        _mm256_sub_epi16(_mm256_loadu_si256(src), avg_epi16));
     if (width == 32) {
       _mm256_storeu_si256(
-          row + 1, _mm256_sub_epi16(_mm256_loadu_si256(row + 1), avg_epi16));
+          dst + 1, _mm256_sub_epi16(_mm256_loadu_si256(src + 1), avg_epi16));
     }
-  } while ((row += CFL_BUF_LINE_I256) < end);
+    src += CFL_BUF_LINE_I256;
+    dst += CFL_BUF_LINE_I256;
+  } while (src < end);
 }
 
 // Declare wrappers for AVX2 sizes
@@ -465,21 +469,21 @@ cfl_subtract_average_fn get_subtract_average_fn_avx2(TX_SIZE tx_size) {
     subtract_average_8x8_sse2,   /* 8x8 */
     subtract_average_16x16_avx2, /* 16x16 */
     subtract_average_32x32_avx2, /* 32x32 */
-    cfl_subtract_average_null,   /* 64x64 (invalid CFL size) */
+    NULL,                        /* 64x64 (invalid CFL size) */
     subtract_average_4x8_sse2,   /* 4x8 */
     subtract_average_8x4_sse2,   /* 8x4 */
     subtract_average_8x16_sse2,  /* 8x16 */
     subtract_average_16x8_avx2,  /* 16x8 */
     subtract_average_16x32_avx2, /* 16x32 */
     subtract_average_32x16_avx2, /* 32x16 */
-    cfl_subtract_average_null,   /* 32x64 (invalid CFL size) */
-    cfl_subtract_average_null,   /* 64x32 (invalid CFL size) */
+    NULL,                        /* 32x64 (invalid CFL size) */
+    NULL,                        /* 64x32 (invalid CFL size) */
     subtract_average_4x16_sse2,  /* 4x16 */
     subtract_average_16x4_avx2,  /* 16x4 */
     subtract_average_8x32_sse2,  /* 8x32 */
     subtract_average_32x8_avx2,  /* 32x8 */
-    cfl_subtract_average_null,   /* 16x64 (invalid CFL size) */
-    cfl_subtract_average_null,   /* 64x16 (invalid CFL size) */
+    NULL,                        /* 16x64 (invalid CFL size) */
+    NULL,                        /* 64x16 (invalid CFL size) */
   };
   // Modulo TX_SIZES_ALL to ensure that an attacker won't be able to
   // index the function pointer array out of bounds.

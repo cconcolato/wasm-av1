@@ -9,11 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_MEM_AOM_MEM_H_
-#define AOM_MEM_AOM_MEM_H_
+#ifndef AOM_AOM_MEM_AOM_MEM_H_
+#define AOM_AOM_MEM_AOM_MEM_H_
 
-#include "aom_config.h"
 #include "aom/aom_integer.h"
+#include "config/aom_config.h"
 
 #if defined(__uClinux__)
 #include <lddk.h>
@@ -67,4 +67,4 @@ void *aom_memset16(void *dest, int val, size_t length);
 }
 #endif
 
-#endif  // AOM_MEM_AOM_MEM_H_
+#endif  // AOM_AOM_MEM_AOM_MEM_H_

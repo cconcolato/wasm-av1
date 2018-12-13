@@ -47,6 +47,7 @@ class AV1ExtTileTest
 
     decoder_ = codec_->CreateDecoder(cfg, 0);
     decoder_->Control(AV1_SET_TILE_MODE, 1);
+    decoder_->Control(AV1D_EXT_TILE_DEBUG, 1);
     decoder_->Control(AV1_SET_DECODE_TILE_ROW, -1);
     decoder_->Control(AV1_SET_DECODE_TILE_COL, -1);
 
@@ -82,13 +83,14 @@ class AV1ExtTileTest
       encoder->Control(AOME_SET_ENABLEAUTOALTREF, 0);
       encoder->Control(AV1E_SET_FRAME_PARALLEL_DECODING, 1);
 
-      // The tile size is 64x64.
-      encoder->Control(AV1E_SET_TILE_COLUMNS, kTileSize);
-      encoder->Control(AV1E_SET_TILE_ROWS, kTileSize);
       // TODO(yunqingwang): test single_tile_decoding = 0.
       encoder->Control(AV1E_SET_SINGLE_TILE_DECODING, 1);
       // Always use 64x64 max partition.
       encoder->Control(AV1E_SET_SUPERBLOCK_SIZE, AOM_SUPERBLOCK_SIZE_64X64);
+      // Set tile_columns and tile_rows to MAX values, which guarantees the tile
+      // size of 64 x 64 pixels(i.e. 1 SB) for <= 4k resolution.
+      encoder->Control(AV1E_SET_TILE_COLUMNS, 6);
+      encoder->Control(AV1E_SET_TILE_ROWS, 6);
     }
 
     if (video->frame() == 1) {

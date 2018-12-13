@@ -9,10 +9,11 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AOM_TIMING_H_
-#define AOM_TIMING_H_
+#ifndef AOM_AV1_COMMON_TIMING_H_
+#define AOM_AV1_COMMON_TIMING_H_
 
 #include "aom/aom_integer.h"
+#include "av1/common/enums.h"
 
 #define MAX_NUM_OP_POINTS 32
 
@@ -26,34 +27,33 @@ typedef struct aom_timing {
 typedef struct aom_dec_model_info {
   uint32_t num_units_in_decoding_tick;
   int encoder_decoder_buffer_delay_length;
-  int buffer_removal_delay_length;
-  int frame_presentation_delay_length;
-  int bitrate_scale;
-  int buffer_size_scale;
+  int buffer_removal_time_length;
+  int frame_presentation_time_length;
 } aom_dec_model_info_t;
 
 typedef struct aom_dec_model_op_parameters {
-  int decoder_model_operating_point_idc;
   int decoder_model_param_present_flag;
-  int bitrate;
-  int buffer_size;
-  int cbr_flag;
-  int decoder_buffer_delay;
-  int encoder_buffer_delay;
+  int64_t bitrate;
+  int64_t buffer_size;
+  uint32_t decoder_buffer_delay;
+  uint32_t encoder_buffer_delay;
   int low_delay_mode_flag;
   int display_model_param_present_flag;
   int initial_display_delay;
 } aom_dec_model_op_parameters_t;
 
 typedef struct aom_op_timing_info_t {
-  int buffer_removal_delay_flag;
-  int64_t buffer_removal_delay;
+  uint32_t buffer_removal_time;
 } aom_op_timing_info_t;
 
 void set_aom_dec_model_info(aom_dec_model_info_t *decoder_model);
 
-void set_dec_model_op_parameters(aom_dec_model_op_parameters_t *op_params,
-                                 aom_dec_model_info_t *decoder_model,
-                                 int64_t bitrate, int op_idc);
+void set_dec_model_op_parameters(aom_dec_model_op_parameters_t *op_params);
 
-#endif  // AOM_TIMING_H_
+void set_resource_availability_parameters(
+    aom_dec_model_op_parameters_t *op_params);
+
+int64_t max_level_bitrate(BITSTREAM_PROFILE seq_profile, int seq_level_idx,
+                          int seq_tier);
+
+#endif  // AOM_AV1_COMMON_TIMING_H_

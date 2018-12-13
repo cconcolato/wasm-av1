@@ -8,13 +8,14 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
-#ifndef AV1_COMMON_X86_AV1_TXFM_SSE2_H_
-#define AV1_COMMON_X86_AV1_TXFM_SSE2_H_
+#ifndef AOM_AV1_COMMON_X86_AV1_TXFM_SSE2_H_
+#define AOM_AV1_COMMON_X86_AV1_TXFM_SSE2_H_
 
 #include <emmintrin.h>  // SSE2
 
-#include "./aom_config.h"
-#include "./av1_rtcd.h"
+#include "config/aom_config.h"
+#include "config/av1_rtcd.h"
+
 #include "aom/aom_integer.h"
 #include "aom_dsp/x86/transpose_sse2.h"
 #include "aom_dsp/x86/txfm_common_sse2.h"
@@ -313,4 +314,4 @@ typedef struct {
 #ifdef __cplusplus
 }
 #endif  // __cplusplus
-#endif  // AV1_COMMON_X86_AV1_TXFM_SSE2_H_
+#endif  // AOM_AV1_COMMON_X86_AV1_TXFM_SSE2_H_

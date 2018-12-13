@@ -1,7 +1,19 @@
+/*
+ * Copyright (c) 2018, Alliance for Open Media. All rights reserved
+ *
+ * This source code is subject to the terms of the BSD 2 Clause License and
+ * the Alliance for Open Media Patent License 1.0. If the BSD 2 Clause License
+ * was not distributed with this source code in the LICENSE file, you can
+ * obtain it at www.aomedia.org/license/software. If the Alliance for Open
+ * Media Patent License 1.0 was not distributed with this source code in the
+ * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
+ */
+
 #include <smmintrin.h>
 
-#include "./aom_config.h"
-#include "./av1_rtcd.h"
+#include "config/aom_config.h"
+#include "config/av1_rtcd.h"
+
 #include "av1/common/restoration.h"
 #include "aom_dsp/x86/synonyms.h"
 
@@ -487,13 +499,15 @@ static void final_filter_fast(int32_t *dst, int dst_stride, const int32_t *A,
   }
 }
 
-void av1_selfguided_restoration_sse4_1(const uint8_t *dgd8, int width,
-                                       int height, int dgd_stride,
-                                       int32_t *flt0, int32_t *flt1,
-                                       int flt_stride, int sgr_params_idx,
-                                       int bit_depth, int highbd) {
-  DECLARE_ALIGNED(16, int32_t, buf[4 * RESTORATION_PROC_UNIT_PELS]);
-  memset(buf, 0, sizeof(buf));
+int av1_selfguided_restoration_sse4_1(const uint8_t *dgd8, int width,
+                                      int height, int dgd_stride, int32_t *flt0,
+                                      int32_t *flt1, int flt_stride,
+                                      int sgr_params_idx, int bit_depth,
+                                      int highbd) {
+  int32_t *buf = (int32_t *)aom_memalign(
+      16, 4 * sizeof(*buf) * RESTORATION_PROC_UNIT_PELS);
+  if (!buf) return -1;
+  memset(buf, 0, 4 * sizeof(*buf) * RESTORATION_PROC_UNIT_PELS);
 
   const int width_ext = width + 2 * SGRPROJ_BORDER_HORZ;
   const int height_ext = height + 2 * SGRPROJ_BORDER_VERT;
@@ -562,6 +576,8 @@ void av1_selfguided_restoration_sse4_1(const uint8_t *dgd8, int width,
     final_filter(flt1, flt_stride, A, B, buf_stride, dgd8, dgd_stride, width,
                  height, highbd);
   }
+  aom_free(buf);
+  return 0;
 }
 
 void apply_selfguided_restoration_sse4_1(const uint8_t *dat8, int width,
@@ -572,8 +588,10 @@ void apply_selfguided_restoration_sse4_1(const uint8_t *dat8, int width,
   int32_t *flt0 = tmpbuf;
   int32_t *flt1 = flt0 + RESTORATION_UNITPELS_MAX;
   assert(width * height <= RESTORATION_UNITPELS_MAX);
-  av1_selfguided_restoration_sse4_1(dat8, width, height, stride, flt0, flt1,
-                                    width, eps, bit_depth, highbd);
+  const int ret = av1_selfguided_restoration_sse4_1(
+      dat8, width, height, stride, flt0, flt1, width, eps, bit_depth, highbd);
+  (void)ret;
+  assert(!ret);
   const sgr_params_type *const params = &sgr_params[eps];
   int xq[2];
   decode_xq(xqd, xq, params);

@@ -13,13 +13,15 @@
 
 #include "third_party/googletest/src/googletest/include/gtest/gtest.h"
 
-#include "./aom_config.h"
-#include "./aom_dsp_rtcd.h"
+#include "config/aom_config.h"
+#include "config/aom_dsp_rtcd.h"
+
 #include "test/acm_random.h"
 #include "test/clear_system_state.h"
 #include "test/register_state_check.h"
 #include "test/util.h"
 #include "av1/common/blockd.h"
+#include "av1/common/common.h"
 #include "av1/common/pred_common.h"
 #include "aom_mem/aom_mem.h"
 
@@ -35,6 +37,15 @@ typedef void (*HighbdIntraPred)(uint16_t *dst, ptrdiff_t stride,
 typedef void (*IntraPred)(uint8_t *dst, ptrdiff_t stride, const uint8_t *above,
                           const uint8_t *left);
 
+}  // namespace
+
+// NOTE: Under gcc version 7.3.0 (Debian 7.3.0-5), if this template is in the
+// anonymous namespace, then we get a strange compiler warning in
+// the begin() and end() methods of the ParamGenerator template class in
+// gtest/internal/gtest-param-util.h:
+//   warning: ‘<anonymous>’ is used uninitialized in this function
+// As a workaround, put this template outside the anonymous namespace.
+// See bug aomedia:2003.
 template <typename FuncType>
 struct IntraPredFunc {
   IntraPredFunc(FuncType pred = NULL, FuncType ref = NULL,
@@ -49,6 +60,8 @@ struct IntraPredFunc {
   int block_height;
   int bit_depth;
 };
+
+namespace {
 
 template <typename FuncType, typename Pixel>
 class AV1IntraPredTest
@@ -139,27 +152,32 @@ class LowbdIntraPredTest : public AV1IntraPredTest<IntraPred, uint8_t> {
   }
 };
 
+// Suppress an unitialized warning. Once there are implementations to test then
+// this can be restored.
 TEST_P(HighbdIntraPredTest, Bitexact) {
-  // max block size is 32
-  DECLARE_ALIGNED(16, uint16_t, left_col[2 * 32]);
-  DECLARE_ALIGNED(16, uint16_t, above_data[2 * 32 + 32]);
-  DECLARE_ALIGNED(16, uint16_t, dst[3 * 32 * 32]);
-  DECLARE_ALIGNED(16, uint16_t, ref_dst[3 * 32 * 32]);
-  memset(left_col, 0, sizeof(left_col));
-  memset(above_data, 0, sizeof(above_data));
+  // max block size is 64
+  DECLARE_ALIGNED(16, uint16_t, left_col[2 * 64]);
+  DECLARE_ALIGNED(16, uint16_t, above_data[2 * 64 + 64]);
+  DECLARE_ALIGNED(16, uint16_t, dst[3 * 64 * 64]);
+  DECLARE_ALIGNED(16, uint16_t, ref_dst[3 * 64 * 64]);
+  av1_zero(left_col);
+  av1_zero(above_data);
   RunTest(left_col, above_data, dst, ref_dst);
 }
 
+// Same issue as above but for arm.
+#if !HAVE_NEON
 TEST_P(LowbdIntraPredTest, Bitexact) {
   // max block size is 32
   DECLARE_ALIGNED(16, uint8_t, left_col[2 * 32]);
   DECLARE_ALIGNED(16, uint8_t, above_data[2 * 32 + 32]);
   DECLARE_ALIGNED(16, uint8_t, dst[3 * 32 * 32]);
   DECLARE_ALIGNED(16, uint8_t, ref_dst[3 * 32 * 32]);
-  memset(left_col, 0, sizeof(left_col));
-  memset(above_data, 0, sizeof(above_data));
+  av1_zero(left_col);
+  av1_zero(above_data);
   RunTest(left_col, above_data, dst, ref_dst);
 }
+#endif  // !HAVE_NEON
 
 // -----------------------------------------------------------------------------
 // High Bit Depth Tests
@@ -179,8 +197,8 @@ TEST_P(LowbdIntraPredTest, Bitexact) {
       highbd_entry(type, 32, 16, opt, bd), highbd_entry(type, 32, 32, opt, bd)
 #endif
 
-  // ---------------------------------------------------------------------------
-  // Low Bit Depth Tests
+// ---------------------------------------------------------------------------
+// Low Bit Depth Tests
 
 #define lowbd_entry(type, width, height, opt)                                  \
   IntraPredFunc<IntraPred>(&aom_##type##_predictor_##width##x##height##_##opt, \
@@ -234,4 +252,15 @@ INSTANTIATE_TEST_CASE_P(AVX2, LowbdIntraPredTest,
 
 #endif  // HAVE_AVX2
 
+#if HAVE_NEON
+const IntraPredFunc<HighbdIntraPred> HighbdIntraPredTestVectorNeon[] = {
+  highbd_entry(dc, 4, 4, neon, 8),   highbd_entry(dc, 8, 8, neon, 8),
+  highbd_entry(dc, 16, 16, neon, 8), highbd_entry(dc, 32, 32, neon, 8),
+  highbd_entry(dc, 64, 64, neon, 8),
+};
+
+INSTANTIATE_TEST_CASE_P(NEON, HighbdIntraPredTest,
+                        ::testing::ValuesIn(HighbdIntraPredTestVectorNeon));
+
+#endif  // HAVE_NEON
 }  // namespace

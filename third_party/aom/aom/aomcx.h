@@ -8,16 +8,16 @@
  * Media Patent License 1.0 was not distributed with this source code in the
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
-#ifndef AOM_AOMCX_H_
-#define AOM_AOMCX_H_
+#ifndef AOM_AOM_AOMCX_H_
+#define AOM_AOM_AOMCX_H_
 
 /*!\defgroup aom_encoder AOMedia AOM/AV1 Encoder
  * \ingroup aom
  *
  * @{
  */
-#include "./aom.h"
-#include "./aom_encoder.h"
+#include "aom/aom.h"
+#include "aom/aom_encoder.h"
 
 /*!\file
  * \brief Provides definitions for using AOM or AV1 encoder algorithm within the
@@ -181,10 +181,6 @@ enum aome_enc_control_id {
    */
   AOME_SET_CPUUSED = 13,
 
-  /*!\brief Speed features for codec development
-   */
-  AOME_SET_DEVSF,
-
   /*!\brief Codec control function to enable automatic set and use alf frames.
    */
   AOME_SET_ENABLEAUTOALTREF,
@@ -286,22 +282,24 @@ enum aome_enc_control_id {
    */
   AV1E_SET_LOSSLESS = AV1E_SET_GF_CBR_BOOST_PCT + 2,
 
+  /** control function to enable the row based multi-threading of encoder. A
+   * value that is equal to 1 indicates that row based multi-threading is
+   * enabled.
+   */
+  AV1E_SET_ROW_MT,
+
   /*!\brief Codec control function to set number of tile columns.
    *
    * In encoding and decoding, AV1 allows an input image frame be partitioned
-   * into separated vertical tile columns, which can be encoded or decoded
+   * into separate vertical tile columns, which can be encoded or decoded
    * independently. This enables easy implementation of parallel encoding and
-   * decoding. This control requests the encoder to use column tiles in
-   * encoding an input frame, with number of tile columns (in Log2 unit) as
-   * the parameter:
+   * decoding. The parameter for this control describes the number of tile
+   * columns (in log2 units), which has a valid range of [0, 6]:
    *             0 = 1 tile column
    *             1 = 2 tile columns
    *             2 = 4 tile columns
    *             .....
    *             n = 2**n tile columns
-   * The requested tile columns will be capped by encoder based on image size
-   * limitation (The minimum width of a tile column is 256 pixel, the maximum
-   * is 4096).
    *
    * By default, the value is 0, i.e. one single column tile for entire image.
    */
@@ -310,20 +308,25 @@ enum aome_enc_control_id {
   /*!\brief Codec control function to set number of tile rows.
    *
    * In encoding and decoding, AV1 allows an input image frame be partitioned
-   * into separated horizontal tile rows. Tile rows are encoded or decoded
-   * sequentially. Even though encoding/decoding of later tile rows depends on
-   * earlier ones, this allows the encoder to output data packets for tile rows
-   * prior to completely processing all tile rows in a frame, thereby reducing
-   * the latency in processing between input and output. The parameter
-   * for this control describes the number of tile rows, which has a valid
-   * range [0, 2]:
+   * into separate horizontal tile rows, which can be encoded or decoded
+   * independently. The parameter for this control describes the number of tile
+   * rows (in log2 units), which has a valid range of [0, 6]:
    *            0 = 1 tile row
    *            1 = 2 tile rows
    *            2 = 4 tile rows
+   *            .....
+   *            n = 2**n tile rows
    *
    * By default, the value is 0, i.e. one single row tile for entire image.
    */
   AV1E_SET_TILE_ROWS,
+
+  /*!\brief Codec control function to enable RDO modulated by frame temporal
+   * dependency.
+   *
+   * By default, this feature is off.
+   */
+  AV1E_SET_ENABLE_TPL_MODEL,
 
   /*!\brief Codec control function to enable frame parallel decoding feature.
    *
@@ -685,18 +688,6 @@ enum aome_enc_control_id {
    */
   AV1E_SET_MTU,
 
-  /*!\brief Codec control function to set dependent_horz_tiles.
-   *
-   * In encoding and decoding, AV1 allows enabling dependent horizontal tile
-   * The parameter for this control describes the value of this flag,
-   * which has a valid range [0, 1]:
-   *            0 = disable dependent horizontal tile
-   *            1 = enable dependent horizontal tile,
-   *
-   * By default, the value is 0, i.e. disable dependent horizontal tile.
-   */
-  AV1E_SET_TILE_DEPENDENT_ROWS,
-
   /*!\brief Codec control function to set the number of symbols in an ANS data
    * window.
    *
@@ -780,35 +771,6 @@ enum aome_enc_control_id {
    */
   AV1E_SET_ENABLE_SUPERRES,
 
-  /*!\brief Codec control function to set loop_filter_across_tiles_v_enabled
-   * and loop_filter_across_tiles_h_enabled.
-   * In encoding and decoding, AV1 allows disabling loop filter across tile
-   * boundary The parameter for this control describes the value of this flag,
-   * which has a valid range [0, 1]:
-   *            0 = disable loop filter across tile boundary
-   *            1 = enable loop filter across tile boundary
-   *
-   * By default, the value is 1, i.e. enable loop filter across tile boundary.
-   *
-   * Experiment: LOOPFILTERING_ACROSS_TILES_EXT
-   */
-  AV1E_SET_TILE_LOOPFILTER_V,
-  AV1E_SET_TILE_LOOPFILTER_H,
-
-  /*!\brief Codec control function to set loop_filter_across_tiles_enabled.
-   *
-   * In encoding and decoding, AV1 allows disabling loop filter across tile
-   * boundary The parameter for this control describes the value of this flag,
-   * which has a valid range [0, 1]:
-   *            0 = disable loop filter across tile boundary
-   *            1 = enable loop filter across tile boundary
-   *
-   * By default, the value is 1, i.e. enable loop filter across tile boundary.
-   *
-   * Experiment: LOOPFILTERING_ACROSS_TILES
-   */
-  AV1E_SET_TILE_LOOPFILTER,
-
   /*!\brief Codec control function to set the delta q mode
    *
    * AV1 has a segment based feature that allows encoder to adaptively change
@@ -854,6 +816,18 @@ enum aome_enc_control_id {
   /*!\brief Codec control function to set the path to the film grain parameters
    */
   AV1E_SET_FILM_GRAIN_TABLE,
+
+  /*!\brief Sets the noise level */
+  AV1E_SET_DENOISE_NOISE_LEVEL,
+
+  /*!\brief Sets the denoisers block size */
+  AV1E_SET_DENOISE_BLOCK_SIZE,
+
+  /*!\brief Sets the chroma subsampling x value */
+  AV1E_SET_CHROMA_SUBSAMPLING_X,
+
+  /*!\brief Sets the chroma subsampling y value */
+  AV1E_SET_CHROMA_SUBSAMPLING_Y,
 };
 
 /*!\brief aom 1-D scaling mode
@@ -987,20 +961,16 @@ AOM_CTRL_USE_TYPE(AOME_SET_TUNING, int) /* aom_tune_metric */
 AOM_CTRL_USE_TYPE(AOME_SET_CQ_LEVEL, unsigned int)
 #define AOM_CTRL_AOME_SET_CQ_LEVEL
 
+AOM_CTRL_USE_TYPE(AV1E_SET_ROW_MT, int)
+#define AOM_CTRL_AV1E_SET_ROW_MT
+
 AOM_CTRL_USE_TYPE(AV1E_SET_TILE_COLUMNS, int)
 #define AOM_CTRL_AV1E_SET_TILE_COLUMNS
 AOM_CTRL_USE_TYPE(AV1E_SET_TILE_ROWS, int)
 #define AOM_CTRL_AV1E_SET_TILE_ROWS
 
-AOM_CTRL_USE_TYPE(AV1E_SET_TILE_DEPENDENT_ROWS, int)
-#define AOM_CTRL_AV1E_SET_TILE_DEPENDENT_ROWS
-
-AOM_CTRL_USE_TYPE(AV1E_SET_TILE_LOOPFILTER_V, int)
-#define AOM_CTRL_AV1E_SET_TILE_LOOPFILTER_V
-AOM_CTRL_USE_TYPE(AV1E_SET_TILE_LOOPFILTER_H, int)
-#define AOM_CTRL_AV1E_SET_TILE_LOOPFILTER_H
-AOM_CTRL_USE_TYPE(AV1E_SET_TILE_LOOPFILTER, int)
-#define AOM_CTRL_AV1E_SET_TILE_LOOPFILTER
+AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_TPL_MODEL, unsigned int)
+#define AOM_CTRL_AV1E_SET_ENABLE_TPL_MODEL
 
 AOM_CTRL_USE_TYPE(AOME_GET_LAST_QUANTIZER, int *)
 #define AOM_CTRL_AOME_GET_LAST_QUANTIZER
@@ -1056,7 +1026,7 @@ AOM_CTRL_USE_TYPE(AV1E_SET_NUM_TG, unsigned int)
 AOM_CTRL_USE_TYPE(AV1E_SET_MTU, unsigned int)
 #define AOM_CTRL_AV1E_SET_MTU
 
-AOM_CTRL_USE_TYPE(AV1E_SET_TIMING_INFO_TYPE, aom_timing_info_type_t)
+AOM_CTRL_USE_TYPE(AV1E_SET_TIMING_INFO_TYPE, int) /* aom_timing_info_type_t */
 #define AOM_CTRL_AV1E_SET_TIMING_INFO_TYPE
 
 AOM_CTRL_USE_TYPE(AV1E_SET_ENABLE_DF, unsigned int)
@@ -1131,10 +1101,6 @@ AOM_CTRL_USE_TYPE(AV1E_GET_ACTIVEMAP, aom_active_map_t *)
 AOM_CTRL_USE_TYPE(AV1E_SET_COLOR_RANGE, int)
 #define AOM_CTRL_AV1E_SET_COLOR_RANGE
 
-/*!\brief
- *
- * TODO(rbultje) : add support of the control in ffmpeg
- */
 #define AOM_CTRL_AV1E_SET_RENDER_SIZE
 AOM_CTRL_USE_TYPE(AV1E_SET_RENDER_SIZE, int *)
 
@@ -1165,10 +1131,24 @@ AOM_CTRL_USE_TYPE(AV1E_SET_FILM_GRAIN_TABLE, const char *)
 AOM_CTRL_USE_TYPE(AV1E_SET_CDF_UPDATE_MODE, int)
 #define AOM_CTRL_AV1E_SET_CDF_UPDATE_MODE
 
+#ifdef CONFIG_DENOISE
+AOM_CTRL_USE_TYPE(AV1E_SET_DENOISE_NOISE_LEVEL, int);
+#define AOM_CTRL_AV1E_SET_DENOISE_NOISE_LEVEL
+
+AOM_CTRL_USE_TYPE(AV1E_SET_DENOISE_BLOCK_SIZE, unsigned int);
+#define AOM_CTRL_AV1E_SET_DENOISE_BLOCK_SIZE
+#endif
+
+AOM_CTRL_USE_TYPE(AV1E_SET_CHROMA_SUBSAMPLING_X, unsigned int)
+#define AOM_CTRL_AV1E_SET_CHROMA_SUBSAMPLING_X
+
+AOM_CTRL_USE_TYPE(AV1E_SET_CHROMA_SUBSAMPLING_Y, unsigned int)
+#define AOM_CTRL_AV1E_SET_CHROMA_SUBSAMPLING_Y
+
 /*!\endcond */
 /*! @} - end defgroup aom_encoder */
 #ifdef __cplusplus
 }  // extern "C"
 #endif
 
-#endif  // AOM_AOMCX_H_
+#endif  // AOM_AOM_AOMCX_H_

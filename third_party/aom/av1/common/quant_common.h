@@ -9,8 +9,8 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_QUANT_COMMON_H_
-#define AV1_COMMON_QUANT_COMMON_H_
+#ifndef AOM_AV1_COMMON_QUANT_COMMON_H_
+#define AOM_AV1_COMMON_QUANT_COMMON_H_
 
 #include "aom/aom_codec.h"
 #include "av1/common/seg_common.h"
@@ -42,7 +42,6 @@ int16_t av1_dc_quant_Q3(int qindex, int delta, aom_bit_depth_t bit_depth);
 int16_t av1_ac_quant_Q3(int qindex, int delta, aom_bit_depth_t bit_depth);
 int16_t av1_dc_quant_QTX(int qindex, int delta, aom_bit_depth_t bit_depth);
 int16_t av1_ac_quant_QTX(int qindex, int delta, aom_bit_depth_t bit_depth);
-int16_t av1_qindex_from_ac_Q3(int ac_Q3, aom_bit_depth_t bit_depth);
 
 int av1_get_qindex(const struct segmentation *seg, int segment_id,
                    int base_qindex);
@@ -61,4 +60,4 @@ const qm_val_t *av1_qmatrix(struct AV1Common *cm, int qindex, int comp,
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_QUANT_COMMON_H_
+#endif  // AOM_AV1_COMMON_QUANT_COMMON_H_

@@ -9,11 +9,12 @@
  * PATENTS file, you can obtain it at www.aomedia.org/license/patent.
  */
 
-#ifndef AV1_COMMON_ONYXC_INT_H_
-#define AV1_COMMON_ONYXC_INT_H_
+#ifndef AOM_AV1_COMMON_ONYXC_INT_H_
+#define AOM_AV1_COMMON_ONYXC_INT_H_
 
-#include "./aom_config.h"
-#include "./av1_rtcd.h"
+#include "config/aom_config.h"
+#include "config/av1_rtcd.h"
+
 #include "aom/internal/aom_codec_internal.h"
 #include "aom_util/aom_thread.h"
 #include "av1/common/alloccommon.h"
@@ -27,9 +28,7 @@
 #include "av1/common/quant_common.h"
 #include "av1/common/restoration.h"
 #include "av1/common/tile_common.h"
-#if CONFIG_BUFFER_MODEL
 #include "av1/common/timing.h"
-#endif
 #include "av1/common/odintrin.h"
 #include "av1/encoder/hash_motion.h"
 #include "aom_dsp/grain_synthesis.h"
@@ -110,11 +109,39 @@ typedef struct {
   MV_REFERENCE_FRAME ref_frame;
 } MV_REF;
 
-typedef struct {
+// FIXME(jack.haughton@argondesign.com): This enum was originally in
+// encoder/ratectrl.h, and is encoder specific. When we move to C++, this
+// should go back there and BufferPool should be templatized.
+typedef enum {
+  INTER_NORMAL = 0,
+  INTER_LOW = 1,
+  INTER_HIGH = 2,
+  GF_ARF_LOW = 3,
+  GF_ARF_STD = 4,
+  KF_STD = 5,
+  RATE_FACTOR_LEVELS = 6
+} RATE_FACTOR_LEVEL;
+
+typedef struct RefCntBuffer {
+  // For a RefCntBuffer, the following are reference-holding variables:
+  // - cm->ref_frame_map[]
+  // - cm->new_fb_idx
+  // - cm->scaled_ref_idx[] (encoder only)
+  // - cm->next_ref_frame_map[] (decoder only)
+  // - pbi->output_frame_index[] (decoder only)
+  // With that definition, 'ref_count' is the number of reference-holding
+  // variables that are currently referencing this buffer.
+  // For example:
+  // - suppose this buffer is at index 'k' in the buffer pool, and
+  // - Total 'n' of the variables / array elements above have value 'k' (that
+  // is, they are pointing to buffer at index 'k').
+  // Then, pool->frame_bufs[k].ref_count = n.
+  // TODO(david.turner@argondesign.com) Check whether this helpful comment is
+  // still correct after we finish restructuring
   int ref_count;
 
-  unsigned int cur_frame_offset;
-  unsigned int ref_frame_offset[INTER_REFS_PER_FRAME];
+  unsigned int order_hint;
+  unsigned int ref_order_hints[INTER_REFS_PER_FRAME];
 
   MV_REF *mvs;
   uint8_t *seg_map;
@@ -134,29 +161,23 @@ typedef struct {
   hash_table hash_table;
   uint8_t intra_only;
   FRAME_TYPE frame_type;
-  // The Following variables will only be used in frame parallel decode.
-
-  // frame_worker_owner indicates which FrameWorker owns this buffer. NULL means
-  // that no FrameWorker owns, or is decoding, this buffer.
-  AVxWorker *frame_worker_owner;
-
-  // row and col indicate which position frame has been decoded to in real
-  // pixel unit. They are reset to -1 when decoding begins and set to INT_MAX
-  // when the frame is fully decoded.
-  int row;
-  int col;
 
   // Inter frame reference frame delta for loop filter
   int8_t ref_deltas[REF_FRAMES];
 
   // 0 = ZERO_MV, MV
   int8_t mode_deltas[MAX_MODE_LF_DELTAS];
+
+  FRAME_CONTEXT frame_context;
+  RATE_FACTOR_LEVEL frame_rf_level;
 } RefCntBuffer;
 
 typedef struct BufferPool {
 // Protect BufferPool from being accessed by several FrameWorkers at
 // the same time during frame parallel decode.
 // TODO(hkuang): Try to use atomic variable instead of locking the whole pool.
+// TODO(wtc): Remove this. See
+// https://chromium-review.googlesource.com/c/webm/libvpx/+/560630.
 #if CONFIG_MULTITHREAD
   pthread_mutex_t pool_mutex;
 #endif
@@ -185,7 +206,44 @@ typedef struct BitstreamLevel {
   uint8_t minor;
 } BitstreamLevel;
 
-/* Initial version of sequence header structure */
+typedef struct {
+  int cdef_pri_damping;
+  int cdef_sec_damping;
+  int nb_cdef_strengths;
+  int cdef_strengths[CDEF_MAX_STRENGTHS];
+  int cdef_uv_strengths[CDEF_MAX_STRENGTHS];
+  int cdef_bits;
+} CdefInfo;
+
+typedef struct {
+  int delta_q_present_flag;
+  // Resolution of delta quant
+  int delta_q_res;
+  int delta_lf_present_flag;
+  // Resolution of delta lf level
+  int delta_lf_res;
+  // This is a flag for number of deltas of loop filter level
+  // 0: use 1 delta, for y_vertical, y_horizontal, u, and v
+  // 1: use separate deltas for each filter level
+  int delta_lf_multi;
+} DeltaQInfo;
+
+typedef struct {
+  int enable_order_hint;           // 0 - disable order hint, and related tools
+  int order_hint_bits_minus_1;
+                                   // jnt_comp, ref_frame_mvs, frame_sign_bias
+                                   // if 0, enable_jnt_comp and
+                                   // enable_ref_frame_mvs must be set zs 0.
+  int enable_jnt_comp;             // 0 - disable joint compound modes
+                                   // 1 - enable it
+  int enable_ref_frame_mvs;        // 0 - disable ref frame mvs
+                                   // 1 - enable it
+} OrderHintInfo;
+
+// Sequence header structure.
+// Note: All syntax elements of sequence_header_obu that need to be
+// bit-identical across multiple sequence headers must be part of this struct,
+// so that consistency is checked by are_seq_headers_consistent() function.
 typedef struct SequenceHeader {
   int num_bits_width;
   int num_bits_height;
@@ -197,7 +255,9 @@ typedef struct SequenceHeader {
   BLOCK_SIZE sb_size;  // Size of the superblock used for this frame
   int mib_size;        // Size of the superblock in units of MI blocks
   int mib_size_log2;   // Log 2 of above.
-  int order_hint_bits_minus_1;
+
+  OrderHintInfo order_hint_info;
+
   int force_screen_content_tools;  // 0 - force off
                                    // 1 - force on
                                    // 2 - adaptive
@@ -206,21 +266,12 @@ typedef struct SequenceHeader {
                                    // 2 - adaptive
   int still_picture;               // Video is a single frame still picture
   int reduced_still_picture_hdr;   // Use reduced header for still picture
-  int monochrome;                  // Monochorme video
   int enable_filter_intra;         // enables/disables filterintra
   int enable_intra_edge_filter;    // enables/disables corner/edge/upsampling
   int enable_interintra_compound;  // enables/disables interintra_compound
   int enable_masked_compound;      // enables/disables masked compound
   int enable_dual_filter;          // 0 - disable dual interpolation filter
                                    // 1 - enable vert/horiz filter selection
-  int enable_order_hint;           // 0 - disable order hint, and related tools
-                                   // jnt_comp, ref_frame_mvs, frame_sign_bias
-                                   // if 0, enable_jnt_comp and
-                                   // enable_ref_frame_mvs must be set zs 0.
-  int enable_jnt_comp;             // 0 - disable joint compound modes
-                                   // 1 - enable it
-  int enable_ref_frame_mvs;        // 0 - disable ref frame mvs
-                                   // 1 - enable it
   int enable_warped_motion;        // 0 - disable warped motion for sequence
                                    // 1 - enable it for the sequence
   int enable_superres;     // 0 - Disable superres for the sequence, and disable
@@ -230,23 +281,58 @@ typedef struct SequenceHeader {
                            //     enabled for that frame.
   int enable_cdef;         // To turn on/off CDEF
   int enable_restoration;  // To turn on/off loop restoration
-  int operating_point_idc[MAX_NUM_OPERATING_POINTS];
-  BitstreamLevel level[MAX_NUM_OPERATING_POINTS];
-  int decoder_rate_model_param_present_flag[MAX_NUM_OPERATING_POINTS];
-#if !CONFIG_BUFFER_MODEL
-  int decode_to_display_rate_ratio[MAX_NUM_OPERATING_POINTS];
-  int initial_display_delay[MAX_NUM_OPERATING_POINTS];
-  int extra_frame_buffers[MAX_NUM_OPERATING_POINTS];
-#endif
-} SequenceHeader;
+  BITSTREAM_PROFILE profile;
 
-typedef struct AV1Common {
-  struct aom_internal_error_info error;
+  // Operating point info.
+  int operating_points_cnt_minus_1;
+  int operating_point_idc[MAX_NUM_OPERATING_POINTS];
+  int display_model_info_present_flag;
+  int decoder_model_info_present_flag;
+  BitstreamLevel level[MAX_NUM_OPERATING_POINTS];
+  uint8_t tier[MAX_NUM_OPERATING_POINTS];  // seq_tier in the spec. One bit: 0
+                                           // or 1.
+
+  // Color config.
+  aom_bit_depth_t bit_depth;  // AOM_BITS_8 in profile 0 or 1,
+                              // AOM_BITS_10 or AOM_BITS_12 in profile 2 or 3.
+  int use_highbitdepth;       // If true, we need to use 16bit frame buffers.
+  int monochrome;             // Monochorme video
   aom_color_primaries_t color_primaries;
   aom_transfer_characteristics_t transfer_characteristics;
   aom_matrix_coefficients_t matrix_coefficients;
-  aom_chroma_sample_position_t chroma_sample_position;
   int color_range;
+  int subsampling_x;          // Chroma subsampling for x
+  int subsampling_y;          // Chroma subsampling for y
+  aom_chroma_sample_position_t chroma_sample_position;
+  int separate_uv_delta_q;
+
+  int film_grain_params_present;
+} SequenceHeader;
+
+typedef struct {
+    int skip_mode_allowed;
+    int skip_mode_flag;
+    int ref_frame_idx_0;
+    int ref_frame_idx_1;
+} SkipModeInfo;
+
+typedef struct {
+  FRAME_TYPE frame_type;
+  // Flag signaling that the frame is encoded using only INTRA modes.
+  uint8_t intra_only;
+  REFERENCE_MODE reference_mode;
+
+  unsigned int order_hint;
+  unsigned int frame_number;
+  SkipModeInfo skip_mode_info;
+  // Each Inter frame can reference INTER_REFS_PER_FRAME buffers. This maps each
+  // (inter) reference frame type to the corresponding reference buffer.
+  RefBuffer frame_refs[INTER_REFS_PER_FRAME];
+} CurrentFrame;
+
+typedef struct AV1Common {
+  CurrentFrame current_frame;
+  struct aom_internal_error_info error;
   int width;
   int height;
   int render_width;
@@ -254,28 +340,12 @@ typedef struct AV1Common {
   int last_width;
   int last_height;
   int timing_info_present;
-#if !CONFIG_BUFFER_MODEL
-  uint32_t num_units_in_tick;
-  uint32_t time_scale;
-  int equal_picture_interval;
-  uint32_t num_ticks_per_picture;
-#else
   aom_timing_info_t timing_info;
-  int operating_points_decoder_model_cnt;
-  int decoder_model_info_present_flag;
-  int buffer_removal_delay_present;
+  int buffer_removal_time_present;
   aom_dec_model_info_t buffer_model;
   aom_dec_model_op_parameters_t op_params[MAX_NUM_OPERATING_POINTS + 1];
   aom_op_timing_info_t op_frame_timing[MAX_NUM_OPERATING_POINTS + 1];
-  int tu_presentation_delay_flag;
-  int64_t tu_presentation_delay;
-#endif
-
-  // TODO(jkoleszar): this implies chroma ss right now, but could vary per
-  // plane. Revisit as part of the future change to YV12_BUFFER_CONFIG to
-  // support additional planes.
-  int subsampling_x;
-  int subsampling_y;
+  uint32_t frame_presentation_time;
 
   int largest_tile_id;
   size_t largest_tile_size;
@@ -284,34 +354,28 @@ typedef struct AV1Common {
   // Scale of the current frame with respect to itself.
   struct scale_factors sf_identity;
 
-  // Marks if we need to use 16bit frame buffers (1: yes, 0: no).
-  int use_highbitdepth;
   YV12_BUFFER_CONFIG *frame_to_show;
   RefCntBuffer *prev_frame;
 
   // TODO(hkuang): Combine this with cur_buf in macroblockd.
   RefCntBuffer *cur_frame;
 
-  int ref_frame_map[REF_FRAMES]; /* maps fb_idx to reference slot */
+  // For decoder, ref_frame_map[i] maps reference type 'i' to actual index of
+  // the buffer in the buffer pool ‘cm->buffer_pool.frame_bufs’.
+  // For encoder, ref_frame_map[j] (where j = remapped_ref_idx[i]) maps
+  // remapped reference index 'j' (that is, original reference type 'i') to
+  // actual index of the buffer in the buffer pool ‘cm->buffer_pool.frame_bufs’.
+  int ref_frame_map[REF_FRAMES];
 
   // Prepare ref_frame_map for the next frame.
   // Only used in frame parallel decode.
   int next_ref_frame_map[REF_FRAMES];
 
-  // TODO(jkoleszar): could expand active_ref_idx to 4, with 0 as intra, and
-  // roll new_fb_idx into it.
-
-  // Each Inter frame can reference INTER_REFS_PER_FRAME buffers
-  RefBuffer frame_refs[INTER_REFS_PER_FRAME];
-  int is_skip_mode_allowed;
-  int skip_mode_flag;
-  int ref_frame_idx_0;
-  int ref_frame_idx_1;
-
+  // Index to the 'new' frame (i.e. the frame currently being encoded or
+  // decoded) in the buffer pool 'cm->buffer_pool'.
   int new_fb_idx;
 
   FRAME_TYPE last_frame_type; /* last frame's frame type for motion search.*/
-  FRAME_TYPE frame_type;
 
   int show_frame;
   int showable_frame;  // frame can be used as show existing frame in future
@@ -321,8 +385,6 @@ typedef struct AV1Common {
   int is_reference_frame;
   int reset_decoder_state;
 
-  // Flag signaling that the frame is encoded using only INTRA modes.
-  uint8_t intra_only;
   uint8_t last_intra_only;
   uint8_t disable_cdf_update;
   int allow_high_precision_mv;
@@ -353,9 +415,7 @@ typedef struct AV1Common {
   int u_ac_delta_q;
   int v_ac_delta_q;
 
-  int separate_uv_delta_q;
-
-  // The dequantizers below are true dequntizers used only in the
+  // The dequantizers below are true dequantizers used only in the
   // dequantization process.  They have the same coefficient
   // shift/scale as TX.
   int16_t y_dequant_QTX[MAX_SEGMENTS][2];
@@ -420,12 +480,9 @@ typedef struct AV1Common {
   int superres_upscaled_height;
   RestorationInfo rst_info[MAX_MB_PLANE];
 
-  // rst_end_stripe[i] is one more than the index of the bottom stripe
-  // for tile row i.
-  int rst_end_stripe[MAX_TILE_ROWS];
-
   // Pointer to a scratch buffer used by self-guided restoration
   int32_t *rst_tmpbuf;
+  RestorationLineBuffers *rlbs;
 
   // Output of loop restoration
   YV12_BUFFER_CONFIG rst_frame;
@@ -446,22 +503,13 @@ typedef struct AV1Common {
   // Context probabilities for reference frame prediction
   MV_REFERENCE_FRAME comp_fwd_ref[FWD_REFS];
   MV_REFERENCE_FRAME comp_bwd_ref[BWD_REFS];
-  REFERENCE_MODE reference_mode;
 
   FRAME_CONTEXT *fc;              /* this frame entropy */
-  FRAME_CONTEXT *frame_contexts;  // FRAME_CONTEXTS
+  FRAME_CONTEXT *default_frame_context;
   unsigned int frame_context_idx; /* Context to use/update */
   int fb_of_context_type[REF_FRAMES];
   int primary_ref_frame;
-  FRAME_COUNTS counts;
 
-  unsigned int frame_offset;
-
-  unsigned int current_video_frame;
-  BITSTREAM_PROFILE profile;
-
-  // AOM_BITS_8 in profile 0 or 1, AOM_BITS_10 or AOM_BITS_12 in profile 2 or 3.
-  aom_bit_depth_t bit_depth;
   aom_bit_depth_t dequant_bit_depth;  // bit_depth of current dequantizer
 
   int error_resilient_mode;
@@ -489,14 +537,7 @@ typedef struct AV1Common {
 
   int byte_alignment;
   int skip_loop_filter;
-
-  // Private data associated with the frame buffer callbacks.
-  void *cb_priv;
-  aom_get_frame_buffer_cb_fn_t get_fb_cb;
-  aom_release_frame_buffer_cb_fn_t release_fb_cb;
-
-  // Handles memory for the codec.
-  InternalFrameBufferList int_frame_buffers;
+  int skip_film_grain;
 
   // External BufferPool passed from outside.
   BufferPool *buffer_pool;
@@ -505,26 +546,11 @@ typedef struct AV1Common {
   ENTROPY_CONTEXT **above_context[MAX_MB_PLANE];
   TXFM_CONTEXT **above_txfm_context;
   WarpedMotionParams global_motion[REF_FRAMES];
-  aom_film_grain_table_t *film_grain_table;
-  int film_grain_params_present;
   aom_film_grain_t film_grain_params;
-  int cdef_pri_damping;
-  int cdef_sec_damping;
-  int nb_cdef_strengths;
-  int cdef_strengths[CDEF_MAX_STRENGTHS];
-  int cdef_uv_strengths[CDEF_MAX_STRENGTHS];
-  int cdef_bits;
 
-  int delta_q_present_flag;
-  // Resolution of delta quant
-  int delta_q_res;
-  int delta_lf_present_flag;
-  // Resolution of delta lf level
-  int delta_lf_res;
-  // This is a flag for number of deltas of loop filter level
-  // 0: use 1 delta, for y_vertical, y_horizontal, u, and v
-  // 1: use separate deltas for each filter level
-  int delta_lf_multi;
+  CdefInfo cdef_info;
+  DeltaQInfo delta_q_info;  // Delta Q and Delta LF parameters
+
   int num_tg;
   SequenceHeader seq_params;
   int current_frame_id;
@@ -542,7 +568,8 @@ typedef struct AV1Common {
   int frame_refs_short_signaling;
   int temporal_layer_id;
   int spatial_layer_id;
-  int number_spatial_layers;
+  unsigned int number_temporal_layers;
+  unsigned int number_spatial_layers;
   int num_allocated_above_context_mi_col;
   int num_allocated_above_contexts;
   int num_allocated_above_context_planes;
@@ -559,6 +586,7 @@ typedef struct AV1Common {
   int64_t txcoeff_cost_count;
 #endif
   const cfg_options_t *options;
+  int is_decoding;
 } AV1_COMMON;
 
 // TODO(hkuang): Don't need to lock the whole pool after implementing atomic
@@ -600,7 +628,7 @@ static INLINE int get_free_fb(AV1_COMMON *cm) {
     if (frame_bufs[i].ref_count == 0) break;
 
   if (i != FRAME_BUFFERS) {
-    if (frame_bufs[i].buf.use_external_refernce_buffers) {
+    if (frame_bufs[i].buf.use_external_reference_buffers) {
       // If this frame buffer's y_buffer, u_buffer, and v_buffer point to the
       // external reference buffers. Restore the buffer pointers to point to the
       // internally allocated memory.
@@ -608,11 +636,14 @@ static INLINE int get_free_fb(AV1_COMMON *cm) {
       ybf->y_buffer = ybf->store_buf_adr[0];
       ybf->u_buffer = ybf->store_buf_adr[1];
       ybf->v_buffer = ybf->store_buf_adr[2];
-      ybf->use_external_refernce_buffers = 0;
+      ybf->use_external_reference_buffers = 0;
     }
 
     frame_bufs[i].ref_count = 1;
   } else {
+    // We should never run out of free buffers. If this assertion fails, there
+    // is a reference leak.
+    assert(0 && "Ran out of free frame buffers. Likely a reference leak.");
     // Reset i to be INVALID_IDX to indicate no free buffer found.
     i = INVALID_IDX;
   }
@@ -621,40 +652,46 @@ static INLINE int get_free_fb(AV1_COMMON *cm) {
   return i;
 }
 
-static INLINE void ref_cnt_fb(RefCntBuffer *bufs, int *idx, int new_idx) {
-  const int ref_index = *idx;
+// Modify 'idx_ptr' to reference the buffer at 'new_idx', and update the ref
+// counts accordingly.
+static INLINE void assign_frame_buffer(RefCntBuffer *bufs, int *idx_ptr,
+                                       int new_idx) {
+  const int old_idx = *idx_ptr;
+  if (old_idx >= 0) {
+    assert(bufs[old_idx].ref_count > 0);
+    // One less reference to the buffer at 'old_idx', so decrease ref count.
+    --bufs[old_idx].ref_count;
+  }
 
-  if (ref_index >= 0 && bufs[ref_index].ref_count > 0)
-    bufs[ref_index].ref_count--;
-
-  *idx = new_idx;
-
-  bufs[new_idx].ref_count++;
+  *idx_ptr = new_idx;
+  // One more reference to the buffer at 'new_idx', so increase ref count.
+  ++bufs[new_idx].ref_count;
 }
 
 static INLINE int frame_is_intra_only(const AV1_COMMON *const cm) {
-  return cm->frame_type == KEY_FRAME || cm->intra_only;
+  return cm->current_frame.frame_type == KEY_FRAME ||
+      cm->current_frame.intra_only;
 }
 
 static INLINE int frame_is_sframe(const AV1_COMMON *cm) {
-  return cm->frame_type == S_FRAME;
+  return cm->current_frame.frame_type == S_FRAME;
 }
 
 static INLINE RefCntBuffer *get_prev_frame(const AV1_COMMON *const cm) {
   if (cm->primary_ref_frame == PRIMARY_REF_NONE ||
-      cm->frame_refs[cm->primary_ref_frame].idx == INVALID_IDX) {
+      cm->current_frame.frame_refs[cm->primary_ref_frame].buf == NULL) {
     return NULL;
   } else {
-    return &cm->buffer_pool
-                ->frame_bufs[cm->frame_refs[cm->primary_ref_frame].idx];
+    return cm->current_frame.frame_refs[cm->primary_ref_frame].buf;
   }
 }
 
 // Returns 1 if this frame might allow mvs from some reference frame.
 static INLINE int frame_might_allow_ref_frame_mvs(const AV1_COMMON *cm) {
-  return !cm->error_resilient_mode && !cm->large_scale_tile &&
-         cm->seq_params.enable_ref_frame_mvs &&
-         cm->seq_params.enable_order_hint && !frame_is_intra_only(cm);
+  return !cm->error_resilient_mode &&
+    cm->seq_params.order_hint_info.enable_ref_frame_mvs &&
+    cm->seq_params.order_hint_info.enable_order_hint &&
+    !frame_is_intra_only(cm);
 }
 
 // Returns 1 if this frame might use warped_motion
@@ -694,15 +731,7 @@ static INLINE void ensure_mv_buffer(RefCntBuffer *buf, AV1_COMMON *cm) {
   }
 }
 
-static INLINE int mi_cols_aligned_to_sb(const AV1_COMMON *cm) {
-  return ALIGN_POWER_OF_TWO(cm->mi_cols, cm->seq_params.mib_size_log2);
-}
-
-static INLINE int mi_rows_aligned_to_sb(const AV1_COMMON *cm) {
-  return ALIGN_POWER_OF_TWO(cm->mi_rows, cm->seq_params.mib_size_log2);
-}
-
-void cfl_init(CFL_CTX *cfl, AV1_COMMON *cm);
+void cfl_init(CFL_CTX *cfl, const SequenceHeader *seq_params);
 
 static INLINE int av1_num_planes(const AV1_COMMON *cm) {
   return cm->seq_params.monochrome ? 1 : MAX_MB_PLANE;
@@ -743,10 +772,9 @@ static INLINE void av1_init_macroblockd(AV1_COMMON *cm, MACROBLOCKD *xd,
       }
     }
   }
-  xd->fc = cm->fc;
   xd->mi_stride = cm->mi_stride;
   xd->error_info = &cm->error;
-  cfl_init(&xd->cfl, cm);
+  cfl_init(&xd->cfl, &cm->seq_params);
 }
 
 static INLINE void set_skip_context(MACROBLOCKD *xd, int mi_row, int mi_col,
@@ -842,18 +870,18 @@ static INLINE void set_mi_row_col(MACROBLOCKD *xd, const TileInfo *const tile,
     xd->chroma_left_mbmi = chroma_left_mi;
   }
 
-  xd->n8_h = bh;
-  xd->n8_w = bw;
+  xd->n4_h = bh;
+  xd->n4_w = bw;
   xd->is_sec_rect = 0;
-  if (xd->n8_w < xd->n8_h) {
+  if (xd->n4_w < xd->n4_h) {
     // Only mark is_sec_rect as 1 for the last block.
     // For PARTITION_VERT_4, it would be (0, 0, 0, 1);
     // For other partitions, it would be (0, 1).
-    if (!((mi_col + xd->n8_w) & (xd->n8_h - 1))) xd->is_sec_rect = 1;
+    if (!((mi_col + xd->n4_w) & (xd->n4_h - 1))) xd->is_sec_rect = 1;
   }
 
-  if (xd->n8_w > xd->n8_h)
-    if (mi_row & (xd->n8_w - 1)) xd->is_sec_rect = 1;
+  if (xd->n4_w > xd->n4_h)
+    if (mi_row & (xd->n4_w - 1)) xd->is_sec_rect = 1;
 }
 
 static INLINE aom_cdf_prob *get_y_mode_cdf(FRAME_CONTEXT *tile_ctx,
@@ -1078,17 +1106,18 @@ static INLINE int max_intra_block_height(const MACROBLOCKD *xd,
   return ALIGN_POWER_OF_TWO(max_blocks_high, tx_size_high_log2[tx_size]);
 }
 
-static INLINE void av1_zero_above_context(AV1_COMMON *const cm,
+static INLINE void av1_zero_above_context(AV1_COMMON *const cm, const MACROBLOCKD *xd,
   int mi_col_start, int mi_col_end, const int tile_row) {
+  const SequenceHeader *const seq_params = &cm->seq_params;
   const int num_planes = av1_num_planes(cm);
   const int width = mi_col_end - mi_col_start;
   const int aligned_width =
-    ALIGN_POWER_OF_TWO(width, cm->seq_params.mib_size_log2);
+    ALIGN_POWER_OF_TWO(width, seq_params->mib_size_log2);
 
   const int offset_y = mi_col_start;
   const int width_y = aligned_width;
-  const int offset_uv = offset_y >> cm->subsampling_x;
-  const int width_uv = width_y >> cm->subsampling_x;
+  const int offset_uv = offset_y >> seq_params->subsampling_x;
+  const int width_uv = width_y >> seq_params->subsampling_x;
 
   av1_zero_array(cm->above_context[0][tile_row] + offset_y, width_y);
   if (num_planes > 1) {
@@ -1096,7 +1125,7 @@ static INLINE void av1_zero_above_context(AV1_COMMON *const cm,
       av1_zero_array(cm->above_context[1][tile_row] + offset_uv, width_uv);
       av1_zero_array(cm->above_context[2][tile_row] + offset_uv, width_uv);
     } else {
-      aom_internal_error(&cm->error, AOM_CODEC_CORRUPT_FRAME,
+      aom_internal_error(xd->error_info, AOM_CODEC_CORRUPT_FRAME,
                          "Invalid value of planes");
     }
   }
@@ -1133,18 +1162,18 @@ static INLINE void set_txfm_ctx(TXFM_CONTEXT *txfm_ctx, uint8_t txs, int len) {
   for (i = 0; i < len; ++i) txfm_ctx[i] = txs;
 }
 
-static INLINE void set_txfm_ctxs(TX_SIZE tx_size, int n8_w, int n8_h, int skip,
+static INLINE void set_txfm_ctxs(TX_SIZE tx_size, int n4_w, int n4_h, int skip,
                                  const MACROBLOCKD *xd) {
   uint8_t bw = tx_size_wide[tx_size];
   uint8_t bh = tx_size_high[tx_size];
 
   if (skip) {
-    bw = n8_w * MI_SIZE;
-    bh = n8_h * MI_SIZE;
+    bw = n4_w * MI_SIZE;
+    bh = n4_h * MI_SIZE;
   }
 
-  set_txfm_ctx(xd->above_txfm_context, bw, n8_w);
-  set_txfm_ctx(xd->left_txfm_context, bh, n8_h);
+  set_txfm_ctx(xd->above_txfm_context, bw, n4_w);
+  set_txfm_ctx(xd->left_txfm_context, bh, n4_h);
 }
 
 static INLINE void txfm_partition_update(TXFM_CONTEXT *above_ctx,
@@ -1230,7 +1259,7 @@ static INLINE int txfm_partition_context(TXFM_CONTEXT *above_ctx,
         (txsize_sqr_up_map[tx_size] != max_tx_size && max_tx_size > TX_8X8) +
         (TX_SIZES - 1 - max_tx_size) * 2;
   }
-  if (category == TXFM_PARTITION_CONTEXTS) return category;
+  assert(category != TXFM_PARTITION_CONTEXTS);
   return category * 3 + above + left;
 }
 
@@ -1345,7 +1374,10 @@ static INLINE int is_valid_seq_level_idx(uint8_t seq_level_idx) {
 
 static INLINE uint8_t major_minor_to_seq_level_idx(BitstreamLevel bl) {
   assert(bl.major >= LEVEL_MAJOR_MIN && bl.major <= LEVEL_MAJOR_MAX);
-  assert(bl.minor >= LEVEL_MINOR_MIN && bl.minor <= LEVEL_MINOR_MAX);
+  // Since bl.minor is unsigned a comparison will return a warning:
+  // comparison is always true due to limited range of data type
+  assert(LEVEL_MINOR_MIN == 0);
+  assert(bl.minor <= LEVEL_MINOR_MAX);
   return ((bl.major - LEVEL_MAJOR_MIN) << LEVEL_MINOR_BITS) + bl.minor;
 }
 
@@ -1353,4 +1385,4 @@ static INLINE uint8_t major_minor_to_seq_level_idx(BitstreamLevel bl) {
 }  // extern "C"
 #endif
 
-#endif  // AV1_COMMON_ONYXC_INT_H_
+#endif  // AOM_AV1_COMMON_ONYXC_INT_H_
