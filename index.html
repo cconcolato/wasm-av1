@@ -9,7 +9,7 @@
   <body>
     <h1>AV1 Image File player</h1>
     <p>This player renders images compliant to the <a href="https://aomediacodec.github.io/av1-avif/">AVIF specification</a>. It is based on open source components: <a href="https://github.com/GoogleChromeLabs/wasm-av1">a JS-port of Libaom</a> and a JS library to process MP4 files <a href="https://gpac.github.io/mp4box.js/">MP4Box.js</a>. You can try <a href="http://download.opencontent.netflix.com/?prefix=AV1/Chimera/AVIF">Netflix sample AVIF files</a> or any other AVIF file. Beware this is an on-going project and not all features of AVIF are supported yet. You can still submit <a href="https://github.com/cconcolato/wasm-av1">issues or pull requests</a>.</p>
-    <p>Select an AVIF file: <input type="file" id="files" name="files[]"/></p>
+    <p>Select an AVIF file: <input type="file" id="files" name="files[]"/><label>Item in the file (if multiple): <input type="number" id="item" value="0"/></label></p>
     <br/>
     <canvas id="view" width="1280px" height="720px"></canvas>
     <script src="third_party/mp4box.js/mp4box.all.js"></script>
@@ -109,9 +109,11 @@
                 var f = files[0];
 
                 if (f.name.endsWith(".avif")) {
-                    parseAVIFFile(f, function(_high_bitdepth, buffer) {
-                        high_bitdepth = _high_bitdepth;
-                        fileAsArray = buffer;
+                    parseAVIFFile(f, function(ivfs) {
+                        var index = +document.getElementById("item").value;
+                        var ivfToRender = ivfs[Math.max(Math.min(ivfs.length-1,index), 0)];
+                        high_bitdepth = ivfToRender.high_bitdepth;
+                        fileAsArray = ivfToRender.buffer;
                         start_playback();
                     });
                 } else {
