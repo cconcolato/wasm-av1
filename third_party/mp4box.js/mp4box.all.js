@@ -3197,7 +3197,9 @@ BoxParser.createFullBoxCtor("iloc", function(stream) {
 		}
 		if (this.version === 1 || this.version === 2) {
 			item.construction_method = (stream.readUint16() & 0xF);
-		} 
+		} else {
+			item.construction_method = 0;
+		}
 		item.data_reference_index = stream.readUint16();
 		switch(this.base_offset_size) {
 			case 0:
@@ -3311,17 +3313,14 @@ BoxParser.createFullBoxCtor("ipma", function(stream) {
 		item_assoc.props = [];
 		for (j = 0; j < association_count; j++) {
 			var tmp = stream.readUint8();
-			var p = [];
+			var p = {};
 			item_assoc.props.push(p);
-			var essential = (tmp & 0x80) >> 7;
-			var property_index;
+			p.essential = ((tmp & 0x80) >> 7) === 1;
 			if (this.flags & 0x1) {
-				property_index = (tmp & 0x7F) << 8 | stream.readUint8();
+				p.property_index = (tmp & 0x7F) << 8 | stream.readUint8();
 			} else {
-				property_index = (tmp & 0x7F);
+				p.property_index = (tmp & 0x7F);
 			}
-			p.push(property_index);
-			p.push(essential === 1);
 		}
 	}
 });
@@ -7411,26 +7410,24 @@ ISOFile.prototype.flattenItemInfo = function() {
 				Log.warn("Item storage with reference to other files: not supported");
 				item.source = meta.dinf.boxes[itemloc.data_reference_index-1];
 			}
-			if (itemloc.construction_method !== undefined) {
+			switch(itemloc.construction_method) {
+				case 0: // offset into the file referenced by the data reference index
+				break;
+				case 1: // offset into the idat box of this meta box
 				Log.warn("Item storage with construction_method : not supported");
-				switch(itemloc.construction_method) {
-					case 0: // offset into the file referenced by the data reference index
-					break;
-					case 1: // offset into the idat box of this meta box
-					break;
-					case 2: // offset into another item
-					break;
-				}
-			} else {
-				item.extents = [];
-				item.size = 0;
-				for (j = 0; j < itemloc.extents.length; j++) {
-					item.extents[j] = {};
-					item.extents[j].offset = itemloc.extents[j].extent_offset + itemloc.base_offset;
-					item.extents[j].length = itemloc.extents[j].extent_length;
-					item.extents[j].alreadyRead = 0;
-					item.size += item.extents[j].length;
-				}
+				break;
+				case 2: // offset into another item
+				Log.warn("Item storage with construction_method : not supported");
+				break;
+			}
+			item.extents = [];
+			item.size = 0;
+			for (j = 0; j < itemloc.extents.length; j++) {
+				item.extents[j] = {};
+				item.extents[j].offset = itemloc.extents[j].extent_offset + itemloc.base_offset;
+				item.extents[j].length = itemloc.extents[j].extent_length;
+				item.extents[j].alreadyRead = 0;
+				item.size += item.extents[j].length;
 			}
 		}
 	}
@@ -7442,6 +7439,27 @@ ISOFile.prototype.flattenItemInfo = function() {
 			var ref = meta.iref.references[i];
 			for (j=0; j<ref.references.length; j++) {
 				items[ref.from_item_ID].ref_to.push({type: ref.type, id: ref.references[j]});
+			}
+		}
+	}
+	if (meta.iprp) {
+		for (var k = 0; k < meta.iprp.ipmas.length; k++) {
+			var ipma = meta.iprp.ipmas[k];
+			for (i = 0; i < ipma.associations.length; i++) {
+				var association = ipma.associations[i];
+				item = items[association.id];
+				if (item.properties === undefined) {
+					item.properties = {};
+					item.properties.boxes = [];
+				}
+				for (j = 0; j < association.props.length; j++) {
+					var propEntry = association.props[j];
+					if (propEntry.property_index > 0) {
+						var propbox = meta.iprp.ipco.boxes[propEntry.property_index-1];
+						item.properties[propbox.type] = propbox;
+						item.properties.boxes.push(propbox);
+					}
+				}
 			}
 		}
 	}
