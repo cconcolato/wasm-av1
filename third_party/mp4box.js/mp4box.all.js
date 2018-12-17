@@ -3357,6 +3357,11 @@ BoxParser.createFullBoxCtor("iref", function(stream) {
 		}
 	}
 });
+// file:src/parsing/irot.js
+BoxParser.createBoxCtor("irot", function(stream) {
+	this.angle = stream.readUint8() & 0x3;
+});
+
 // file:src/parsing/ispe.js
 BoxParser.createFullBoxCtor("ispe", function(stream) {
 	this.image_width = stream.readUint32();
