@@ -2811,7 +2811,13 @@ BoxParser.createBoxCtor("clap", function(stream) {
 	this.horizOffD = stream.readUint32();
 	this.vertOffN = stream.readUint32();
 	this.vertOffD = stream.readUint32();
-});// file:src/parsing/co64.js
+});// file:src/parsing/clli.js
+BoxParser.createBoxCtor("clli", function(stream) {
+	this.max_content_light_level = stream.readUint16();
+    this.max_pic_average_light_level = stream.readUint16();
+});
+
+// file:src/parsing/co64.js
 BoxParser.createFullBoxCtor("co64", function(stream) {
 	var entry_count;
 	var i;
@@ -3396,6 +3402,25 @@ BoxParser.createFullBoxCtor("leva", function(stream) {
 BoxParser.createBoxCtor("maxr", function(stream) {
 	this.period = stream.readUint32();
 	this.bytes = stream.readUint32();
+});
+
+// file:src/parsing/mdcv.js
+BoxParser.createBoxCtor("mdcv", function(stream) {
+    this.display_primaries = [];
+    this.display_primaries[0] = {};
+    this.display_primaries[0].x = stream.readUint16();
+    this.display_primaries[0].y = stream.readUint16();
+    this.display_primaries[1] = {};
+    this.display_primaries[1].x = stream.readUint16();
+    this.display_primaries[1].y = stream.readUint16();
+    this.display_primaries[2] = {};
+    this.display_primaries[2].x = stream.readUint16();
+    this.display_primaries[2].y = stream.readUint16();
+    this.white_point = {};
+    this.white_point.x = stream.readUint16();
+    this.white_point.y = stream.readUint16();
+    this.max_display_mastering_luminance = stream.readUint32();
+    this.min_display_mastering_luminance = stream.readUint32();
 });
 
 // file:src/parsing/mdhd.js
