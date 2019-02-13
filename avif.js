@@ -109,7 +109,7 @@ function AVIFItemToIVF(item) {
 	var fullBuffer = concatenateArrayBuffers(ivfBuffer, fullFrameBuffer);
 	//saveByteArray([fullBuffer], 'example.ivf');
 	return {
-		high_bitdepth: item.properties.av1C.high_bitdepth,
+		high_bitdepth: item.properties.pixi.bits_per_channels[0] === 10,
 		buffer: fullBuffer
 	};
 }
